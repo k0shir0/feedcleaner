@@ -84,7 +84,11 @@ function sanitizeSettings(patch) {
 }
 
 const handlers = {
-  async VIDEO_PROGRESS({ videoId, percent }) {
+  async VIDEO_PROGRESS({ videoId, percent }, sender) {
+    // Mozilla add-on policy: data from private browsing sessions must not
+    // be retained. Filtering still works there (reads are unaffected);
+    // watch history from private tabs is simply never recorded.
+    if (sender?.tab?.incognito) return { added: false };
     if (typeof videoId !== "string" || !VIDEO_ID_RE.test(videoId)) return { added: false };
     if (typeof percent !== "number" || !Number.isFinite(percent)) return { added: false };
 
@@ -108,7 +112,10 @@ const handlers = {
     return { watchedIds, seenCounts };
   },
 
-  async SEEN_BATCH({ ids }) {
+  async SEEN_BATCH({ ids }, sender) {
+    // Same private-browsing rule as VIDEO_PROGRESS: never persist sightings
+    // observed in a private window.
+    if (sender?.tab?.incognito) return { ok: false };
     if (!Array.isArray(ids)) return { ok: false };
     const valid = ids.filter((id) => typeof id === "string" && VIDEO_ID_RE.test(id));
     if (valid.length === 0) return { ok: true };
@@ -215,10 +222,10 @@ const handlers = {
   },
 };
 
-browser.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message, sender) => {
   const handler = message && handlers[message.type];
   if (!handler) return; // not ours; let other listeners (if any) respond
-  return handler(message);
+  return handler(message, sender);
 });
 
 browser.runtime.onInstalled.addListener(async () => {

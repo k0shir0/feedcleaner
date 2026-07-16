@@ -44,7 +44,12 @@ Or with [web-ext](https://extensionworkshop.com/documentation/develop/getting-st
 ```
 npx web-ext run --source-dir .
 npx web-ext lint --source-dir .
+npx web-ext build --source-dir .
 ```
+
+Packaging is configured in `web-ext-config.mjs`: development-only files
+(`filter-lists/`, `build/`, `docs/`, README, LICENSE) are excluded from the
+built zip, per Mozilla's no-unused-files policy.
 
 ## Permissions — why each one is requested
 
@@ -121,3 +126,11 @@ skip counts. The output is bundled but not loaded — the manifest gains
 - No external requests at runtime — filter lists convert at build time.
 - No `eval`, no remote code; CSP locks extension pages to `'self'`.
 - Export/Import of the watched list is a local JSON file, no cloud.
+- Private browsing leaves no trace: if you enable the extension in private
+  windows, filtering still works there, but watch progress and feed
+  sightings from private tabs are never recorded (the background drops
+  `VIDEO_PROGRESS` / `SEEN_BATCH` from incognito senders).
+
+## License
+
+[MPL-2.0](LICENSE).

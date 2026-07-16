@@ -56,15 +56,6 @@ h1 {
   padding: 8px 0;
 }
 
-.module-row.disabled .module-name {
-  color: var(--muted);
-}
-
-.module-name small {
-  color: var(--muted);
-  font-size: 11px;
-}
-
 body.master-off .modules {
   opacity: 0.45;
   pointer-events: none;
@@ -143,9 +134,4 @@ footer a:hover {
 
 .switch input:checked + .slider::before {
   transform: translateX(16px);
-}
-
-.switch input:disabled + .slider {
-  opacity: 0.5;
-  cursor: not-allowed;
 }

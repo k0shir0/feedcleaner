@@ -60,16 +60,6 @@ h2 {
   font-size: 13px;
 }
 
-.badge {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2px 8px;
-  vertical-align: middle;
-}
-
 .field {
   margin-bottom: 14px;
 }
@@ -91,11 +81,6 @@ label.row.small {
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 10px;
-}
-
-.field.disabled,
-.module-b .field {
-  opacity: 0.55;
 }
 
 input[type="range"] {

@@ -7,7 +7,6 @@ async function render() {
   $("masterEnabled").checked = settings.masterEnabled;
   $("watchFilterEnabled").checked = settings.watchFilterEnabled;
   $("repeatEnabled").checked = settings.repeatEnabled;
-  $("adBlockerEnabled").checked = settings.adBlockerEnabled;
   $("hiddenCount").textContent = String(hiddenCount);
   document.body.classList.toggle("master-off", !settings.masterEnabled);
 }
