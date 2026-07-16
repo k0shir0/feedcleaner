@@ -113,7 +113,8 @@ output {
   flex-wrap: wrap;
 }
 
-.list-toolbar input[type="search"] {
+.list-toolbar input[type="search"],
+.list-toolbar input[type="text"] {
   flex: 1;
   min-width: 160px;
   padding: 6px 10px;
@@ -121,6 +122,30 @@ output {
   border-radius: 6px;
   background: var(--bg);
   color: var(--fg);
+}
+
+textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  resize: vertical;
+}
+
+input[type="number"] {
+  width: 90px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
 }
 
 button {

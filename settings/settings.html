@@ -58,23 +58,124 @@
     </section>
 
     <section>
+      <h2>Privacy</h2>
+
+      <div class="field row">
+        <label for="stripLinks">
+          Clean copied and shared YouTube links (removes si=, feature=, and
+          other tracking parameters)
+        </label>
+        <input type="checkbox" id="stripLinks" />
+      </div>
+
+      <div class="field">
+        <label for="purgeDays">Auto-forget watched/seen videos older than (days)</label>
+        <input type="number" id="purgeDays" min="0" max="365" step="1" />
+        <p class="hint">
+          0 = keep forever. Purged videos can reappear in your feed. Runs at
+          most twice a day.
+        </p>
+      </div>
+
+      <div class="field row">
+        <label for="beaconBlockEnabled">Block YouTube telemetry beacons (experimental)</label>
+        <input type="checkbox" id="beaconBlockEnabled" />
+      </div>
+      <p class="hint">
+        Blocks playback/interaction telemetry requests (log_event, qoe,
+        ptracking…). Watch-history reporting is deliberately not blocked, so
+        your own YouTube history keeps working.
+      </p>
+    </section>
+
+    <section>
+      <h2>Feed cleanup</h2>
+
+      <div class="field row">
+        <label for="hideShorts">Hide Shorts (shelves and Shorts cards)</label>
+        <input type="checkbox" id="hideShorts" />
+      </div>
+      <div class="field row">
+        <label for="hideMixes">Hide Mix / algorithmic playlist cards</label>
+        <input type="checkbox" id="hideMixes" />
+      </div>
+      <div class="field row">
+        <label for="hideLive">Hide live streams</label>
+        <input type="checkbox" id="hideLive" />
+      </div>
+      <div class="field row">
+        <label for="hidePremieres">Hide premieres and upcoming videos</label>
+        <input type="checkbox" id="hidePremieres" />
+      </div>
+
+      <div class="field">
+        <label for="minDurationSec">Hide videos shorter than (seconds)</label>
+        <input type="number" id="minDurationSec" min="0" max="3600" step="5" />
+        <p class="hint">
+          0 = off. Catches shorts-in-disguise. Videos without a visible
+          duration badge are never hidden by this filter.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="channelInput">Blocked channels</label>
+        <div class="list-toolbar">
+          <input type="text" id="channelInput" placeholder="@handle or channel name…" />
+          <button id="addChannel" type="button">Block</button>
+        </div>
+        <ul id="channelList" class="watched-list"></ul>
+        <p class="hint">
+          Matches the channel handle (@name) or its exact display name,
+          case-insensitive.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="keywordInput">Title filters (one per line; /pattern/flags for regex)</label>
+        <textarea
+          id="keywordInput"
+          rows="4"
+          spellcheck="false"
+          placeholder="plain text hides titles containing it&#10;/reg(ex)? filters?/i"
+        ></textarea>
+        <div class="list-toolbar">
+          <button id="saveKeywords" type="button">Save filters</button>
+          <span class="hint" id="keywordStatus"></span>
+        </div>
+      </div>
+    </section>
+
+    <section>
       <h2>Watched videos <span class="count" id="watchedCount"></span></h2>
 
       <div class="list-toolbar">
         <input type="search" id="search" placeholder="Search video IDs…" />
-        <button id="exportBtn" type="button">Export JSON</button>
-        <button id="importBtn" type="button">Import JSON</button>
-        <input type="file" id="importFile" accept=".json,application/json" hidden />
         <button id="clearAll" type="button" class="danger">Clear All</button>
+      </div>
+
+      <ul id="watchedList" class="watched-list"></ul>
+      <p class="hint" id="listNote"></p>
+    </section>
+
+    <section>
+      <h2>Backup</h2>
+
+      <div class="list-toolbar">
+        <button id="exportBtn" type="button">Export backup</button>
+        <button id="importBtn" type="button">Import backup</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden />
       </div>
 
       <label class="row small">
         <input type="checkbox" id="importReplace" />
-        Import replaces the current list (unchecked = merge)
+        Import replaces existing data (unchecked = merge)
       </label>
 
-      <ul id="watchedList" class="watched-list"></ul>
-      <p class="hint" id="listNote"></p>
+      <p class="hint">
+        One JSON file with settings, the watched list (with dates), and
+        repeat-sighting counts. Watched-list files exported by older versions
+        import fine too.
+      </p>
     </section>
 
   </main>

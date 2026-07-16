@@ -1,9 +1,8 @@
 # FeedCleaner
 
-A privacy-focused Firefox (Manifest V3) extension with two modules sharing one
-shell:
+A privacy-focused Firefox (Manifest V3) extension:
 
-- **Module A — Watched Video Filter** *(implemented)*: tracks videos you've
+- **Watched Video Filter** *(implemented)*: tracks videos you've
   watched, (or videos you have seen already on the youtube home page more than a certain amount of time) past a configurable threshold (default 80%) and hides their cards
   from the home feed, search results, watch-page sidebar, and channel pages, but you can configure the extension to show a placeholder instead of the repeat video.
 - **Repeat Video Fixer** *(implemented)*: counts how often a card has been
@@ -12,12 +11,29 @@ shell:
   configurable 1–10 in settings. Hide decisions use sighting counts
   snapshotted at navigation time, so a card never vanishes while you're
   looking at it.
+- **Link cleaner** *(implemented, on by default, toggleable)*: strips
+  tracking parameters (`si=`, `feature=`, `pp=`, …) from YouTube links you
+  copy on the page and from the share dialog. Functional params (`v`, `t`,
+  `list`) are never touched.
+- **Feed cleanup filters** *(implemented, all off by default)*: hide Shorts
+  (shelves + cards), Mix/algorithmic playlist cards, live streams,
+  premieres, videos shorter than N seconds, blocked channels
+  (handle or display name), and title keyword/regex matches. Rule-hidden
+  cards get a placeholder with a per-page-session "Show anyway".
+- **Auto-purge** *(off by default)*: forget watched/seen entries older than
+  N days (1–365) so the dedupe list can't grow forever.
+- **Telemetry-beacon blocker** *(opt-in, off by default)*: a small static
+  declarativeNetRequest ruleset ([dnr/yt-beacons.json](dnr/yt-beacons.json))
+  blocks YouTube's playback/interaction telemetry (log_event, qoe, atr,
+  ptracking, gen_204…). Watch-history reporting (`api/stats/watchtime`) is
+  deliberately NOT blocked so your own YouTube history keeps working.
 - **Module B — Ad / Tracker Blocker** *(designed, not active)*: static
   declarativeNetRequest rules generated from bundled filter lists at build
   time. See [docs/module-b-design.md](docs/module-b-design.md).
 
 Zero telemetry. Zero runtime network requests. All data in
-`browser.storage.local`.
+`browser.storage.local`, exportable/importable as a single JSON backup
+(settings + watched list with dates + sighting counts).
 
 
 
@@ -55,30 +71,39 @@ built zip, per Mozilla's no-unused-files policy.
 
 | Permission | Why |
 |---|---|
-| `storage` | Watched-video IDs and settings in `storage.local`; the session hidden-counter in `storage.session`. That's the whole list. |
+| `storage` | Watched-video map and settings in `storage.local`; the session hidden-counter in `storage.session`. |
+| `clipboardWrite` | The share dialog's Copy button copies from YouTube's internal data model, not the visible input — this lets the link cleaner overwrite the clipboard with the cleaned URL right after. Only used inside that click flow. |
+| `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 8 static rules scoped to youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
 
 Content scripts run only on `*://www.youtube.com/*` and `*://m.youtube.com/*`
 via `content_scripts.matches` — this needs no separate host permission grant.
-Not requested: `tabs`, `webRequest`, `declarativeNetRequest` (added only when
-Module B activates — see the manifest diff in the Module B design doc),
-host permissions, or anything else.
+Not requested: `tabs`, `webRequest`, host permissions, or anything else.
 
 ## Architecture
 
 ```
-content/shared.js          all YouTube DOM assumptions (selectors, ID parsing)
+content/shared.js          all YouTube DOM assumptions (selectors, ID parsing,
+                           card metadata extraction, URL cleaning)
+content/url-privacy.js     copy/share tracking-param stripping
 content/youtube-player.js  timeupdate watch tracking + SPA nav re-attachment
 content/youtube-feed.js    MutationObserver → idle-batched card filtering
-background/service-worker.js  message hub; the ONLY writer of storage
+background/service-worker.js  message hub; the ONLY writer of storage;
+                           auto-purge; DNR ruleset toggle
+dnr/yt-beacons.json        opt-in telemetry-blocking ruleset (static, packaged)
 popup/, settings/          UI; talk to background via messages
 build/convert-filters.js   build-time ABP/uBO → DNR converter (Module B)
 ```
 
 Message flow: content scripts send `VIDEO_PROGRESS` / `GET_WATCHED_IDS` /
 `CARDS_HIDDEN` / `SEEN_BATCH` / `RESET_SEEN`; UI pages send `GET_STATE` /
-`SET_SETTINGS` / `UNWATCH` / `CLEAR_WATCHED` / `IMPORT_WATCHED` / `CLEAR_SEEN`. Content scripts cache the watched-ID set
-locally and refresh it via read-only `storage.onChanged` plus a 30 s fallback
-poll — they never write storage directly.
+`SET_SETTINGS` / `UNWATCH` / `CLEAR_WATCHED` / `IMPORT_WATCHED` /
+`CLEAR_SEEN` / `GET_BACKUP` / `IMPORT_BACKUP`. Content scripts cache the
+watched-ID set locally and refresh it via read-only `storage.onChanged` plus
+a 30 s fallback poll — they never write storage directly.
+
+Storage shapes: `watched` is `{ videoId: watchedAtMs }` (0.3.0 migrated the
+old `watchedIds` string array in `onInstalled`; timestamps power the
+auto-purge). `seenCounts` is `{ videoId: [count, lastSeenMs] }`.
 
 ### Notes that will save you a debugging session
 
@@ -130,6 +155,11 @@ skip counts. The output is bundled but not loaded — the manifest gains
   windows, filtering still works there, but watch progress and feed
   sightings from private tabs are never recorded (the background drops
   `VIDEO_PROGRESS` / `SEEN_BATCH` from incognito senders).
+- Copied/shared YouTube links are cleaned of tracking params by default
+  (disclosed in the AMO description; toggle in settings).
+- Optional auto-purge forgets watched/seen entries older than N days.
+- The telemetry-beacon blocker is opt-in and ships disabled; its ruleset is
+  static, human-readable, and scoped to requests initiated by youtube.com.
 
 ## License
 

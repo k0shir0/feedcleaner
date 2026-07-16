@@ -22,6 +22,16 @@ const DEFAULT_SETTINGS = Object.freeze({
   showLabel: true, // "Already watched" label on placeholder cards
   repeatEnabled: true, // Repeat Video Fixer: hide cards seen too often
   repeatThreshold: 1, // hide after this many prior feed sightings
+  stripLinks: true, // strip tracking params from copied/shared YT links
+  purgeDays: 0, // auto-forget watched/seen entries older than N days; 0 = never
+  beaconBlockEnabled: false, // opt-in: enable the yt-beacons DNR ruleset
+  hideShorts: false, // hide Shorts shelves and /shorts/ cards
+  hideMixes: false, // hide Mix / algorithmic radio cards
+  hideLive: false, // hide live-stream cards
+  hidePremieres: false, // hide premiere/upcoming cards
+  minDurationSec: 0, // hide videos shorter than this; 0 = off
+  blockedChannels: Object.freeze([]), // channel handles/names to hide
+  keywordFilters: Object.freeze([]), // title filters; /…/flags = regex
 });
 
 // Repeat Video Fixer sighting counts: { videoId: [count, lastSeenMs] }.
@@ -50,9 +60,11 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...settings };
 }
 
-async function getWatchedIds() {
-  const { watchedIds } = await browser.storage.local.get("watchedIds");
-  return Array.isArray(watchedIds) ? watchedIds : [];
+// Watched videos: { videoId: watchedAtMs }. Was a bare ID array before
+// 0.3.0; onInstalled migrates old data (timestamps enable purgeDays).
+async function getWatched() {
+  const { watched } = await browser.storage.local.get("watched");
+  return watched && typeof watched === "object" ? watched : {};
 }
 
 async function getSeenCounts() {
@@ -65,22 +77,74 @@ async function getHiddenCount() {
   return typeof hiddenCount === "number" ? hiddenCount : 0;
 }
 
+/** De-dupe, trim, and cap a user-supplied string list. */
+function sanitizeStringList(value, { maxLength, maxEntries }) {
+  if (!Array.isArray(value)) return null;
+  const seen = new Set();
+  const list = [];
+  for (const raw of value) {
+    if (typeof raw !== "string") continue;
+    const entry = raw.trim();
+    if (!entry || entry.length > maxLength) continue;
+    const key = entry.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push(entry);
+    if (list.length >= maxEntries) break;
+  }
+  return list;
+}
+
 function sanitizeSettings(patch) {
   const clean = {};
-  if (typeof patch.masterEnabled === "boolean") clean.masterEnabled = patch.masterEnabled;
-  if (typeof patch.watchFilterEnabled === "boolean") clean.watchFilterEnabled = patch.watchFilterEnabled;
-  if (typeof patch.placeholderMode === "boolean") clean.placeholderMode = patch.placeholderMode;
-  if (typeof patch.showLabel === "boolean") clean.showLabel = patch.showLabel;
+  for (const key of [
+    "masterEnabled",
+    "watchFilterEnabled",
+    "placeholderMode",
+    "showLabel",
+    "repeatEnabled",
+    "stripLinks",
+    "beaconBlockEnabled",
+    "hideShorts",
+    "hideMixes",
+    "hideLive",
+    "hidePremieres",
+  ]) {
+    if (typeof patch[key] === "boolean") clean[key] = patch[key];
+  }
   if (typeof patch.threshold === "number" && Number.isFinite(patch.threshold)) {
     clean.threshold = Math.min(1, Math.max(0.5, patch.threshold));
   }
-  if (typeof patch.repeatEnabled === "boolean") clean.repeatEnabled = patch.repeatEnabled;
   if (typeof patch.repeatThreshold === "number" && Number.isFinite(patch.repeatThreshold)) {
     // Bounds must match the settings-page range input (1–10).
     clean.repeatThreshold = Math.min(10, Math.max(1, Math.round(patch.repeatThreshold)));
   }
+  if (typeof patch.purgeDays === "number" && Number.isFinite(patch.purgeDays)) {
+    clean.purgeDays = Math.min(365, Math.max(0, Math.round(patch.purgeDays)));
+  }
+  if (typeof patch.minDurationSec === "number" && Number.isFinite(patch.minDurationSec)) {
+    clean.minDurationSec = Math.min(3600, Math.max(0, Math.round(patch.minDurationSec)));
+  }
+  const channels = sanitizeStringList(patch.blockedChannels, { maxLength: 100, maxEntries: 1000 });
+  if (channels) clean.blockedChannels = channels;
+  const keywords = sanitizeStringList(patch.keywordFilters, { maxLength: 200, maxEntries: 500 });
+  if (keywords) clean.keywordFilters = keywords;
   // adBlockerEnabled is intentionally not settable until Module B ships.
   return clean;
+}
+
+/**
+ * Enable/disable the static yt-beacons declarativeNetRequest ruleset
+ * (dnr/yt-beacons.json, declared disabled in the manifest). Idempotent.
+ */
+async function applyBeaconRuleset(enabled) {
+  try {
+    await browser.declarativeNetRequest.updateEnabledRulesets(
+      enabled ? { enableRulesetIds: ["yt-beacons"] } : { disableRulesetIds: ["yt-beacons"] }
+    );
+  } catch (e) {
+    console.warn("[FeedCleaner] beacon ruleset toggle failed", e);
+  }
 }
 
 const handlers = {
@@ -97,19 +161,19 @@ const handlers = {
     if (percent < settings.threshold) return { added: false };
 
     return enqueueWrite(async () => {
-      const ids = await getWatchedIds();
-      if (ids.includes(videoId)) return { added: false };
-      ids.push(videoId);
-      await browser.storage.local.set({ watchedIds: ids });
+      const watched = await getWatched();
+      if (videoId in watched) return { added: false };
+      watched[videoId] = Date.now();
+      await browser.storage.local.set({ watched });
       return { added: true };
     });
   },
 
   async GET_WATCHED_IDS() {
-    const [watchedIds, seen] = await Promise.all([getWatchedIds(), getSeenCounts()]);
+    const [watched, seen] = await Promise.all([getWatched(), getSeenCounts()]);
     const seenCounts = {};
     for (const [id, entry] of Object.entries(seen)) seenCounts[id] = entry[0];
-    return { watchedIds, seenCounts };
+    return { watchedIds: Object.keys(watched), seenCounts };
   },
 
   async SEEN_BATCH({ ids }, sender) {
@@ -168,19 +232,24 @@ const handlers = {
 
   async SET_SETTINGS({ settings: patch }) {
     if (!patch || typeof patch !== "object") return { settings: await getSettings() };
+    const clean = sanitizeSettings(patch);
     return enqueueWrite(async () => {
-      const merged = { ...(await getSettings()), ...sanitizeSettings(patch) };
+      const merged = { ...(await getSettings()), ...clean };
       await browser.storage.local.set({ settings: merged });
+      if ("beaconBlockEnabled" in clean) applyBeaconRuleset(merged.beaconBlockEnabled);
       return { settings: merged };
     });
   },
 
   async UNWATCH({ videoId }) {
     return enqueueWrite(async () => {
-      const ids = await getWatchedIds();
-      const next = ids.filter((id) => id !== videoId);
+      const watched = await getWatched();
       const updates = {};
-      if (next.length !== ids.length) updates.watchedIds = next;
+      const removed = videoId in watched;
+      if (removed) {
+        delete watched[videoId];
+        updates.watched = watched;
+      }
       // Unwatching means "show me this again" — clear its sighting count
       // too, or the Repeat Fixer instantly re-hides the card.
       const seen = await getSeenCounts();
@@ -189,25 +258,94 @@ const handlers = {
         updates.seenCounts = seen;
       }
       if (Object.keys(updates).length > 0) await browser.storage.local.set(updates);
-      return { removed: next.length !== ids.length, watchedCount: next.length };
+      return { removed, watchedCount: Object.keys(watched).length };
     });
   },
 
   async CLEAR_WATCHED() {
     return enqueueWrite(async () => {
-      await browser.storage.local.set({ watchedIds: [] });
+      await browser.storage.local.set({ watched: {} });
       return { watchedCount: 0 };
     });
   },
 
+  // Legacy import path: a bare ID array (pre-0.3.0 export files). Imported
+  // entries get the import time as their watched date.
   async IMPORT_WATCHED({ ids, mode }) {
     if (!Array.isArray(ids)) return { error: "ids must be an array" };
     const valid = [...new Set(ids.filter((id) => typeof id === "string" && VIDEO_ID_RE.test(id)))];
     return enqueueWrite(async () => {
-      const current = mode === "replace" ? [] : await getWatchedIds();
-      const merged = [...new Set([...current, ...valid])];
-      await browser.storage.local.set({ watchedIds: merged });
-      return { watchedCount: merged.length, imported: valid.length, skipped: ids.length - valid.length };
+      const watched = mode === "replace" ? {} : await getWatched();
+      const now = Date.now();
+      for (const id of valid) {
+        if (!(id in watched)) watched[id] = now;
+      }
+      await browser.storage.local.set({ watched });
+      return {
+        watchedCount: Object.keys(watched).length,
+        imported: valid.length,
+        skipped: ids.length - valid.length,
+      };
+    });
+  },
+
+  async GET_BACKUP() {
+    const [settings, watched, seenCounts] = await Promise.all([
+      getSettings(),
+      getWatched(),
+      getSeenCounts(),
+    ]);
+    return {
+      format: "feedcleaner/backup",
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      settings,
+      watched,
+      seenCounts,
+    };
+  },
+
+  // Unified backup import: settings (sanitized) + watched map + seen counts.
+  // mode "replace" swaps the stored data; anything else merges.
+  async IMPORT_BACKUP({ data, mode }) {
+    if (!data || typeof data !== "object") return { error: "not a backup object" };
+    const replace = mode === "replace";
+    const now = Date.now();
+
+    const settingsPatch =
+      data.settings && typeof data.settings === "object" ? sanitizeSettings(data.settings) : {};
+
+    const validWatched = {};
+    if (data.watched && typeof data.watched === "object") {
+      for (const [id, ts] of Object.entries(data.watched)) {
+        if (!VIDEO_ID_RE.test(id)) continue;
+        const t = Number(ts);
+        validWatched[id] = Number.isFinite(t) && t > 0 && t <= now ? t : now;
+      }
+    }
+
+    const validSeen = {};
+    if (data.seenCounts && typeof data.seenCounts === "object") {
+      for (const [id, entry] of Object.entries(data.seenCounts)) {
+        if (!VIDEO_ID_RE.test(id) || !Array.isArray(entry)) continue;
+        const count = Math.floor(Number(entry[0]));
+        if (!Number.isFinite(count) || count < 1) continue;
+        const ts = Number(entry[1]);
+        validSeen[id] = [count, Number.isFinite(ts) ? ts : now];
+      }
+    }
+
+    return enqueueWrite(async () => {
+      const settings = { ...(await getSettings()), ...settingsPatch };
+      const watched = replace ? validWatched : { ...(await getWatched()), ...validWatched };
+      const seenCounts = replace ? validSeen : { ...(await getSeenCounts()), ...validSeen };
+      await browser.storage.local.set({ settings, watched, seenCounts });
+      applyBeaconRuleset(settings.beaconBlockEnabled);
+      return {
+        watchedCount: Object.keys(watched).length,
+        seenCount: Object.keys(seenCounts).length,
+        settingsApplied: Object.keys(settingsPatch).length,
+      };
     });
   },
 
@@ -228,7 +366,73 @@ browser.runtime.onMessage.addListener((message, sender) => {
   return handler(message, sender);
 });
 
-browser.runtime.onInstalled.addListener(async () => {
-  const { settings } = await browser.storage.local.get("settings");
-  await browser.storage.local.set({ settings: { ...DEFAULT_SETTINGS, ...settings } });
-});
+browser.runtime.onInstalled.addListener(() =>
+  enqueueWrite(async () => {
+    const { settings, watchedIds, watched } = await browser.storage.local.get([
+      "settings",
+      "watchedIds",
+      "watched",
+    ]);
+    const merged = { ...DEFAULT_SETTINGS, ...settings };
+    const updates = { settings: merged };
+
+    // Pre-0.3.0 migration: bare ID array → { id: watchedAtMs } map, so
+    // purgeDays has dates to work with. Old entries get the migration time.
+    if (Array.isArray(watchedIds)) {
+      const now = Date.now();
+      const map = watched && typeof watched === "object" ? { ...watched } : {};
+      for (const id of watchedIds) {
+        if (!(id in map)) map[id] = now;
+      }
+      updates.watched = map;
+    }
+
+    await browser.storage.local.set(updates);
+    if (Array.isArray(watchedIds)) await browser.storage.local.remove("watchedIds");
+
+    // Ruleset state is not persisted with settings — re-sync on every
+    // install/update in case they drifted (e.g. restored profile).
+    await applyBeaconRuleset(merged.beaconBlockEnabled);
+  })
+);
+
+/* ------------------------------ auto-purge ------------------------------ */
+
+const PURGE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Drop watched entries and seen counts older than settings.purgeDays.
+ * Runs on every background wake-up (event page re-executes top level),
+ * throttled to one real pass per 12 h via lastPurgeMs.
+ */
+async function maybePurge() {
+  const settings = await getSettings();
+  if (!settings.purgeDays) return;
+  const { lastPurgeMs } = await browser.storage.local.get("lastPurgeMs");
+  const now = Date.now();
+  if (typeof lastPurgeMs === "number" && now - lastPurgeMs < PURGE_CHECK_INTERVAL_MS) return;
+
+  await enqueueWrite(async () => {
+    const cutoff = now - settings.purgeDays * DAY_MS;
+    const watched = await getWatched();
+    const seen = await getSeenCounts();
+
+    const nextWatched = {};
+    for (const [id, ts] of Object.entries(watched)) {
+      if (Number(ts) >= cutoff) nextWatched[id] = ts;
+    }
+    const nextSeen = {};
+    for (const [id, entry] of Object.entries(seen)) {
+      if (Array.isArray(entry) && Number(entry[1]) >= cutoff) nextSeen[id] = entry;
+    }
+
+    await browser.storage.local.set({
+      watched: nextWatched,
+      seenCounts: nextSeen,
+      lastPurgeMs: now,
+    });
+  });
+}
+
+maybePurge().catch((e) => console.warn("[FeedCleaner] purge failed", e));

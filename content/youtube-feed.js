@@ -21,25 +21,26 @@
 "use strict";
 
 (() => {
-  const { store, CARD_SELECTOR, extractVideoId } = YTWash;
+  const { store, CARD_SELECTOR, SHELF_SELECTOR, extractCardInfo } = YTWash;
 
   const HOST_CLASS = "ytwash-placeholder-host";
   const PLACEHOLDER_CLASS = "ytwash-placeholder";
 
+  // Categorical hides (channel/keyword/duration/mix/live/premiere/shorts)
+  // the user overrode with "Show anyway" — page-session only, no storage.
+  const sessionReveals = new Set();
+
   /* --------------------------- card show/hide --------------------------- */
 
-  function buildPlaceholder(videoId, reason, seenCount) {
+  function buildPlaceholder(videoId, reason, label) {
     const box = document.createElement("div");
     box.className = PLACEHOLDER_CLASS;
 
     if (store.settings.showLabel) {
-      const label = document.createElement("span");
-      label.className = "ytwash-placeholder-label";
-      label.textContent =
-        reason === "watched"
-          ? "Already watched"
-          : `Seen ${seenCount} time${seenCount === 1 ? "" : "s"} already`;
-      box.appendChild(label);
+      const labelEl = document.createElement("span");
+      labelEl.className = "ytwash-placeholder-label";
+      labelEl.textContent = label;
+      box.appendChild(labelEl);
     }
 
     const button = document.createElement("button");
@@ -48,9 +49,15 @@
     button.textContent = reason === "watched" ? "Unwatch" : "Show anyway";
     button.addEventListener("click", (e) => {
       e.stopPropagation();
-      const type = reason === "watched" ? "UNWATCH" : "RESET_SEEN";
-      browser.runtime.sendMessage({ type, videoId }).catch(() => {});
-      // storage.onChanged → store.refresh() → re-filter restores the card.
+      if (reason === "watched" || reason === "repeat") {
+        const type = reason === "watched" ? "UNWATCH" : "RESET_SEEN";
+        browser.runtime.sendMessage({ type, videoId }).catch(() => {});
+        // storage.onChanged → store.refresh() → re-filter restores the card.
+      } else {
+        // Rule-based hide: reveal for this page session only.
+        sessionReveals.add(videoId);
+        schedulePass();
+      }
     });
     box.appendChild(button);
 
@@ -58,13 +65,15 @@
   }
 
   /** @returns {boolean} true if the card transitioned from visible to hidden */
-  function hideCard(card, videoId, reason, seenCount) {
-    const mode = store.settings.placeholderMode ? "placeholder" : "hard";
+  function hideCard(card, videoId, reason, label) {
+    // Rule-based hides can lack a video ID (nothing to key a placeholder
+    // button on) — hard-hide those regardless of placeholder mode.
+    const mode = store.settings.placeholderMode && videoId ? "placeholder" : "hard";
     if (
       card.dataset.ytwashState === mode &&
-      card.dataset.ytwashId === videoId &&
+      card.dataset.ytwashId === (videoId || "") &&
       card.dataset.ytwashReason === reason &&
-      card.dataset.ytwashCount === String(seenCount)
+      card.dataset.ytwashLabel === label
     ) {
       return false;
     }
@@ -77,12 +86,12 @@
     } else {
       // CSS rule on HOST_CLASS hides every child except our placeholder.
       card.classList.add(HOST_CLASS);
-      card.appendChild(buildPlaceholder(videoId, reason, seenCount));
+      card.appendChild(buildPlaceholder(videoId, reason, label));
     }
     card.dataset.ytwashState = mode;
-    card.dataset.ytwashId = videoId;
+    card.dataset.ytwashId = videoId || "";
     card.dataset.ytwashReason = reason;
-    card.dataset.ytwashCount = String(seenCount);
+    card.dataset.ytwashLabel = label;
     return wasVisible;
   }
 
@@ -94,7 +103,93 @@
     delete card.dataset.ytwashState;
     delete card.dataset.ytwashId;
     delete card.dataset.ytwashReason;
-    delete card.dataset.ytwashCount;
+    delete card.dataset.ytwashLabel;
+  }
+
+  /* ------------------------ rule matcher compilation --------------------- */
+
+  // Compiled once per settings change, read on every card decision.
+  let channelMatchers = []; // lowercase, leading @ stripped
+  let keywordMatchers = []; // { re } or { sub } (lowercase substring)
+
+  function compileMatchers() {
+    const s = store.settings;
+    channelMatchers = (s.blockedChannels || []).map((c) =>
+      c.trim().toLowerCase().replace(/^@/, "")
+    );
+    keywordMatchers = [];
+    for (const raw of s.keywordFilters || []) {
+      const m = /^\/(.+)\/([a-z]*)$/.exec(raw);
+      if (m) {
+        try {
+          keywordMatchers.push({ re: new RegExp(m[1], m[2]) });
+        } catch {
+          // Invalid regex: flagged in the settings UI, skipped here.
+        }
+      } else {
+        keywordMatchers.push({ sub: raw.toLowerCase() });
+      }
+    }
+  }
+
+  function matchedChannel(info) {
+    if (channelMatchers.length === 0) return false;
+    const handle = info.channelHandle ? info.channelHandle.replace(/^@/, "") : null;
+    const name = info.channelName ? info.channelName.trim().toLowerCase() : null;
+    return channelMatchers.some((entry) => entry === handle || entry === name);
+  }
+
+  function matchedKeyword(title) {
+    if (!title || keywordMatchers.length === 0) return false;
+    const lower = title.toLowerCase();
+    return keywordMatchers.some((m) => (m.re ? m.re.test(title) : lower.includes(m.sub)));
+  }
+
+  /**
+   * Why hide this card, or null to show it. Precedence: watched > repeat >
+   * channel > keyword > duration > mix > live > premiere > shorts.
+   * Unknown metadata never hides (e.g. no duration badge ≠ "too short").
+   */
+  function decideCard(info, s) {
+    const id = info.videoId;
+    if (id && sessionReveals.has(id)) return null;
+
+    if (id && s.watchFilterEnabled && store.watched.has(id)) {
+      return { reason: "watched", label: "Already watched" };
+    }
+    if (id && s.repeatEnabled) {
+      const seenCount = seenSnapshot.get(id) ?? 0;
+      if (seenCount >= s.repeatThreshold) {
+        return {
+          reason: "repeat",
+          label: `Seen ${seenCount} time${seenCount === 1 ? "" : "s"} already`,
+        };
+      }
+    }
+    if (matchedChannel(info)) {
+      return {
+        reason: "channel",
+        label: info.channelName ? `Blocked channel: ${info.channelName}` : "Blocked channel",
+      };
+    }
+    if (matchedKeyword(info.title)) {
+      return { reason: "keyword", label: "Hidden by title filter" };
+    }
+    if (
+      s.minDurationSec > 0 &&
+      info.durationSec !== null &&
+      info.durationSec < s.minDurationSec &&
+      !info.isLive
+    ) {
+      return { reason: "duration", label: "Shorter than your minimum" };
+    }
+    if (s.hideMixes && info.isMix) return { reason: "mix", label: "Mix hidden" };
+    if (s.hideLive && info.isLive) return { reason: "live", label: "Live stream hidden" };
+    if (s.hidePremieres && info.isUpcoming) {
+      return { reason: "premiere", label: "Premiere hidden" };
+    }
+    if (s.hideShorts && info.isShort) return { reason: "shorts", label: "Short hidden" };
+    return null;
   }
 
   /* ----------------------- repeat-sighting tracking ---------------------- */
@@ -157,7 +252,6 @@
 
   function runFilterPass() {
     const s = store.settings;
-    const anyFilterOn = s.masterEnabled && (s.watchFilterEnabled || s.repeatEnabled);
     const cards = document.querySelectorAll(CARD_SELECTOR);
     let newlyHidden = 0;
 
@@ -167,29 +261,32 @@
         observedCards.add(card);
       }
 
-      if (!anyFilterOn) {
+      if (!s.masterEnabled) {
         showCard(card);
         continue;
       }
 
-      const videoId = extractVideoId(card);
-      let reason = null;
-      let seenCount = 0;
-      if (videoId) {
-        if (s.watchFilterEnabled && store.watched.has(videoId)) {
-          reason = "watched";
-        } else if (s.repeatEnabled) {
-          seenCount = seenSnapshot.get(videoId) ?? 0;
-          if (seenCount >= s.repeatThreshold) reason = "repeat";
+      // decideCard checks each module's own toggle internally.
+      const info = extractCardInfo(card);
+      const decision = decideCard(info, s);
+      if (decision) {
+        if (hideCard(card, info.videoId, decision.reason, decision.label)) {
+          newlyHidden++;
         }
-      }
-
-      if (reason) {
-        if (hideCard(card, videoId, reason, seenCount)) newlyHidden++;
       } else {
         // Covers unwatched cards, recycled cards whose href changed, and
         // cards we hid before an Unwatch / Show anyway / settings change.
         showCard(card);
+      }
+    }
+
+    // Shorts shelves are containers, not per-video cards: always hard-hide,
+    // count as one hide each.
+    for (const shelf of document.querySelectorAll(SHELF_SELECTOR)) {
+      if (s.masterEnabled && s.hideShorts) {
+        if (hideCard(shelf, null, "shorts-shelf", "Shorts shelf hidden")) newlyHidden++;
+      } else {
+        showCard(shelf);
       }
     }
 
@@ -219,6 +316,7 @@
 
   store.ready().then(() => {
     seenSnapshot = new Map(store.seen);
+    compileMatchers();
     schedulePass(); // initial scan (idle-scheduled per performance budget)
 
     new MutationObserver(schedulePass).observe(document.body, {
@@ -233,6 +331,7 @@
     // it doesn't even earn a re-filter pass (they arrive every ~2s while
     // scrolling in any tab).
     store.onChange((info) => {
+      if (!info || info.settingsChanged) compileMatchers();
       let decreased = false;
       for (const [id, count] of seenSnapshot) {
         const live = store.seen.get(id) ?? 0;
