@@ -222,12 +222,12 @@ const handlers = {
   },
 
   async GET_STATE() {
-    const [settings, watchedIds, hiddenCount] = await Promise.all([
+    const [settings, watched, hiddenCount] = await Promise.all([
       getSettings(),
-      getWatchedIds(),
+      getWatched(),
       getHiddenCount(),
     ]);
-    return { settings, watchedCount: watchedIds.length, hiddenCount };
+    return { settings, watchedCount: Object.keys(watched).length, hiddenCount };
   },
 
   async SET_SETTINGS({ settings: patch }) {
@@ -363,7 +363,14 @@ const handlers = {
 browser.runtime.onMessage.addListener((message, sender) => {
   const handler = message && handlers[message.type];
   if (!handler) return; // not ours; let other listeners (if any) respond
-  return handler(message, sender);
+  return handler(message, sender).catch((e) => {
+    // A throwing handler rejects the caller's sendMessage, and every caller
+    // awaits it inside a render/refresh path — so the only symptom is a UI
+    // that quietly stops updating. 0.3.0 shipped a dead GET_STATE for a full
+    // release because of that silence. Name the failing message type here.
+    console.error(`[FeedCleaner] ${message.type} handler failed`, e);
+    throw e;
+  });
 });
 
 browser.runtime.onInstalled.addListener(() =>

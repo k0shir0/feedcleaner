@@ -116,6 +116,13 @@ auto-purge). `seenCounts` is `{ videoId: [count, lastSeenMs] }`.
 - **The background gets suspended.** It's an event page: every handler
   re-reads storage, nothing lives in memory, and the session counter is
   read-modify-written to `storage.session` on each increment.
+- **A throwing background handler looks like "settings don't save."** Every
+  UI reads state through `sendMessage`, so a handler that rejects just leaves
+  the popup, the settings page, and the content-script cache sitting on their
+  built-in defaults — writes still land in storage, they just can never be
+  read back. The dispatcher logs `[FeedCleaner] <TYPE> handler failed`; check
+  the background console (`about:debugging` → **Inspect**) before suspecting
+  storage itself.
 
 ## Build pipeline (Module B)
 

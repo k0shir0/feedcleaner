@@ -21,7 +21,7 @@
 "use strict";
 
 (() => {
-  const { store, CARD_SELECTOR, SHELF_SELECTOR, extractCardInfo } = YTWash;
+  const { store, CARD_SELECTOR, SHELF_SELECTOR, extractCardInfo, extractVideoId } = YTWash;
 
   const HOST_CLASS = "ytwash-placeholder-host";
   const PLACEHOLDER_CLASS = "ytwash-placeholder";
