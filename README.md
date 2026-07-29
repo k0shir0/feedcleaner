@@ -150,8 +150,12 @@ skip counts. The output is bundled but not loaded — the manifest gains
    ceiling.
 5. **Blocking webRequest** still works for signed Firefox MV3 extensions as a
    fallback; Chrome MV3 removed it. Module B deliberately targets DNR anyway.
-6. **`storage.session`** needs Firefox ≥ 115 (`strict_min_version` is set
-   accordingly).
+6. **`storage.session`** needs Firefox ≥ 115 and `declarativeNetRequest`
+   needs ≥ 113, but `strict_min_version` is **140** — the floor is set by
+   `data_collection_permissions`, which Firefox ignores before 140. Mozilla's
+   [data-consent guide](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/)
+   recommends pinning the minimum rather than shipping a key older browsers
+   silently drop.
 
 ## Privacy
 
