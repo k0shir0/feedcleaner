@@ -33,7 +33,7 @@
 
   "content_scripts": [
     {
-      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "matches": ["*://www.youtube.com/*"],
       "js": [
         "content/shared.js",
         "content/url-privacy.js",

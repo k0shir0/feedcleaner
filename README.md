@@ -75,9 +75,16 @@ built zip, per Mozilla's no-unused-files policy.
 | `clipboardWrite` | The share dialog's Copy button copies from YouTube's internal data model, not the visible input — this lets the link cleaner overwrite the clipboard with the cleaned URL right after. Only used inside that click flow. |
 | `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 8 static rules scoped to youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
 
-Content scripts run only on `*://www.youtube.com/*` and `*://m.youtube.com/*`
-via `content_scripts.matches` — this needs no separate host permission grant.
+Content scripts run only on `*://www.youtube.com/*` via
+`content_scripts.matches` — this needs no separate host permission grant.
 Not requested: `tabs`, `webRequest`, host permissions, or anything else.
+
+`m.youtube.com` is deliberately **not** matched. The mobile site builds its
+feed from `ytm-*` custom elements and this codebase only knows the desktop
+`ytd-*` / `yt-lockup-view-model` shapes, so injecting there bought nothing
+but an extra origin. Supporting mobile means adding mobile selectors to
+`content/shared.js` first, then re-adding the match — not the other way
+round.
 
 ## Architecture
 
