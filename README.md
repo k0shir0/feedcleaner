@@ -1,11 +1,11 @@
-# FeedCleaner
-
-Devlog:
+# FeedCleaner is now PUBLISHED! 
 Feed Cleaner is now PUBLIC on Firefox!!! You can download directly from Firefox here:
 https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
 
 
 
+
+--- README BELOW --- 
 - **Watched Video Filter**: tracks videos you've watched, or
   videos you have repeatedly seen in the YouTube home feed, then hides their
   cards after a configurable threshold (default 80%). It filters the home
