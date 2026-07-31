@@ -1,38 +1,39 @@
 # FeedCleaner
 
-A privacy-focused Firefox (Manifest V3) extension:
+Devlog:
+Feed Cleaner is now PUBLIC on Firefox!!! You can download directly from Firefox here:
+https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
 
-- **Watched Video Filter** *(implemented)*: tracks videos you've watched, or
+
+
+- **Watched Video Filter**: tracks videos you've watched, or
   videos you have repeatedly seen in the YouTube home feed, then hides their
   cards after a configurable threshold (default 80%). It filters the home
   feed, search results, watch-page sidebar, and channel pages, but always
   leaves the YouTube History page untouched. You can configure a placeholder
   instead of hiding repeat videos outright.
-- **Repeat Video Fixer** *(implemented)*: counts how often a card has been
+- **Repeat Video Fixer**: counts how often a card has been
   in your viewport (≥50% visible, once per page visit) and hides videos that
   keep reappearing unwatched — after 1 prior sighting by default,
   configurable 1–10 in settings. Hide decisions use sighting counts
   snapshotted at navigation time, so a card never vanishes while you're
   looking at it.
-- **Link cleaner** *(implemented, on by default, toggleable)*: strips
+- **Link cleaner**: strips
   tracking parameters (`si=`, `feature=`, `pp=`, …) from YouTube links you
   copy on the page and from the share dialog. Functional params (`v`, `t`,
   `list`) are never touched.
-- **Feed cleanup filters** *(implemented, all off by default)*: hide Shorts
+- **Feed cleanup filters**: hide Shorts
   (shelves + cards), Mix/algorithmic playlist cards, live streams,
   premieres, videos shorter than N seconds, blocked channels
   (handle or display name), and title keyword/regex matches. Rule-hidden
   cards get a placeholder with a per-page-session "Show anyway".
-- **Auto-purge** *(off by default)*: forget watched/seen entries older than
+- **Auto-purge**: forget watched/seen entries older than
   N days (1–365) so the dedupe list can't grow forever.
 - **Telemetry-beacon blocker** *(opt-in, off by default)*: a small static
   declarativeNetRequest ruleset ([dnr/yt-beacons.json](dnr/yt-beacons.json))
   blocks YouTube's playback/interaction telemetry (log_event, qoe, atr,
   ptracking, gen_204…). Watch-history reporting (`api/stats/watchtime`) is
   deliberately NOT blocked so your own YouTube history keeps working.
-- **Module B — Ad / Tracker Blocker** *(designed, not active)*: static
-  declarativeNetRequest rules generated from bundled filter lists at build
-  time. See [docs/module-b-design.md](docs/module-b-design.md).
 
 Zero telemetry. Zero runtime network requests. All data in
 `browser.storage.local`, exportable/importable as a single JSON backup
@@ -51,24 +52,7 @@ Zero telemetry. Zero runtime network requests. All data in
 
 
 
-## Developer stuff below.
 
-## Install (temporary, for development)
-
-1. Firefox → `about:debugging` → **This Firefox** → **Load Temporary Add-on…**
-2. Pick `manifest.json` in this folder.
-
-Or with [web-ext](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/):
-
-```
-npx web-ext run --source-dir .
-npx web-ext lint --source-dir .
-npx web-ext build --source-dir .
-```
-
-Packaging is configured in `web-ext-config.mjs`: development-only files
-(`filter-lists/`, `build/`, `docs/`, README, LICENSE) are excluded from the
-built zip, per Mozilla's no-unused-files policy.
 
 ## Permissions — why each one is requested
 
@@ -114,58 +98,6 @@ a 30 s fallback poll — they never write storage directly.
 Storage shapes: `watched` is `{ videoId: watchedAtMs }` (0.3.0 migrated the
 old `watchedIds` string array in `onInstalled`; timestamps power the
 auto-purge). `seenCounts` is `{ videoId: [count, lastSeenMs] }`.
-
-### Notes that will save you a debugging session
-
-- **YouTube's DOM is a moving target.** Every selector and href-parsing
-  assumption lives in `content/shared.js` and nowhere else. When YouTube
-  renames `ytd-rich-item-renderer`, fix one file.
-- **Shorts loop.** `timeupdate` crosses the threshold on every loop; a
-  per-page-session `reported` Set in `youtube-player.js` ensures one
-  `VIDEO_PROGRESS` per video.
-- **The background gets suspended.** It's an event page: every handler
-  re-reads storage, nothing lives in memory, and the session counter is
-  read-modify-written to `storage.session` on each increment.
-- **A throwing background handler looks like "settings don't save."** Every
-  UI reads state through `sendMessage`, so a handler that rejects just leaves
-  the popup, the settings page, and the content-script cache sitting on their
-  built-in defaults — writes still land in storage, they just can never be
-  read back. The dispatcher logs `[FeedCleaner] <TYPE> handler failed`; check
-  the background console (`about:debugging` → **Inspect**) before suspecting
-  storage itself.
-
-## Build pipeline (Module B)
-
-```
-node build/convert-filters.js
-```
-
-Reads `filter-lists/sources/*.txt` (ABP/uBO or hosts syntax), writes
-`filter-lists/rules.json`, prints a per-list conversion report with per-reason
-skip counts. The output is bundled but not loaded — the manifest gains
-`declarativeNetRequest` only when Module B ships.
-
-## Firefox vs Chrome MV3 divergences that shaped this code
-
-1. **Background**: Firefox runs event-driven **background scripts**
-   (`background.scripts`), not service workers. Chrome needs
-   `background.service_worker`. A port would declare both keys.
-2. **Namespace & promises**: this code uses Firefox's native promise-based
-   `browser.*`. Chrome needs `chrome.*` or the
-   `webextension-polyfill` shim.
-3. **`browser_specific_settings.gecko.id`** is required for Firefox MV3
-   signing/permanent install; Chrome ignores it.
-4. **DNR limits**: Firefox guarantees 330,000 static rules; Chrome guarantees
-   30,000 per ruleset plus a shared pool. The converter enforces the Firefox
-   ceiling.
-5. **Blocking webRequest** still works for signed Firefox MV3 extensions as a
-   fallback; Chrome MV3 removed it. Module B deliberately targets DNR anyway.
-6. **`storage.session`** needs Firefox ≥ 115 and `declarativeNetRequest`
-   needs ≥ 113, but `strict_min_version` is **140** — the floor is set by
-   `data_collection_permissions`, which Firefox ignores before 140. Mozilla's
-   [data-consent guide](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/)
-   recommends pinning the minimum rather than shipping a key older browsers
-   silently drop.
 
 ## Privacy
 
