@@ -30,6 +30,14 @@
   // the user overrode with "Show anyway" — page-session only, no storage.
   const sessionReveals = new Set();
 
+  // History is an intentional archive, not a recommendation surface. Keep
+  // every card visible there and do not let browsing it affect repeat counts.
+  // YouTube keeps the same document while navigating, so this must be checked
+  // at execution time rather than only when the content script starts.
+  function isHistoryPage() {
+    return location.pathname === "/feed/history";
+  }
+
   /* --------------------------- card show/hide --------------------------- */
 
   function buildPlaceholder(videoId, reason, label) {
@@ -220,6 +228,7 @@
 
   const sightingObserver = new IntersectionObserver(
     (entries) => {
+      if (isHistoryPage()) return;
       const s = store.settings;
       if (!s.masterEnabled || !s.repeatEnabled) return;
       for (const entry of entries) {
@@ -251,6 +260,16 @@
   /* ----------------------------- filter pass ---------------------------- */
 
   function runFilterPass() {
+    if (isHistoryPage()) {
+      // Restore only elements we changed instead of scanning every History
+      // card. This is normally O(0), or O(h) after an SPA transition where h
+      // is the number of cards/shelves previously hidden by this extension.
+      for (const element of document.querySelectorAll("[data-ytwash-state]")) {
+        showCard(element);
+      }
+      return;
+    }
+
     const s = store.settings;
     const cards = document.querySelectorAll(CARD_SELECTOR);
     let newlyHidden = 0;

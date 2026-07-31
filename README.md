@@ -2,9 +2,12 @@
 
 A privacy-focused Firefox (Manifest V3) extension:
 
-- **Watched Video Filter** *(implemented)*: tracks videos you've
-  watched, (or videos you have seen already on the youtube home page more than a certain amount of time) past a configurable threshold (default 80%) and hides their cards
-  from the home feed, search results, watch-page sidebar, and channel pages, but you can configure the extension to show a placeholder instead of the repeat video.
+- **Watched Video Filter** *(implemented)*: tracks videos you've watched, or
+  videos you have repeatedly seen in the YouTube home feed, then hides their
+  cards after a configurable threshold (default 80%). It filters the home
+  feed, search results, watch-page sidebar, and channel pages, but always
+  leaves the YouTube History page untouched. You can configure a placeholder
+  instead of hiding repeat videos outright.
 - **Repeat Video Fixer** *(implemented)*: counts how often a card has been
   in your viewport (≥50% visible, once per page visit) and hides videos that
   keep reappearing unwatched — after 1 prior sighting by default,
