@@ -19,9 +19,9 @@ https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
   snapshotted at navigation time, so a card never vanishes while you're
   looking at it.
 - **Link cleaner**: strips
-  tracking parameters (`si=`, `feature=`, `pp=`, …) from YouTube links you
-  copy on the page and from the share dialog. Functional params (`v`, `t`,
-  `list`) are never touched.
+  tracking parameters (`si=`, `feature=`, `pp=`, `utm_*`, …) from YouTube
+  links you copy on the page and from the share dialog. Functional params
+  (`v`, `t`, `list`) are never touched.
 - **Feed cleanup filters**: hide Shorts
   (shelves + cards), Mix/algorithmic playlist cards, live streams,
   premieres, videos shorter than N seconds, blocked channels
@@ -29,11 +29,17 @@ https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
   cards get a placeholder with a per-page-session "Show anyway".
 - **Auto-purge**: forget watched/seen entries older than
   N days (1–365) so the dedupe list can't grow forever.
+- **"Are you still watching?" bypass** *(opt-in, off by default)*: answers
+  YouTube's "Video paused. Continue watching?" and YouTube Music's
+  "Are you still there?" inactivity dialogs by clicking Continue, exactly as
+  a user would — no preemptive event tampering. Mind the trade-off: playback
+  keeps running when you walk away (bandwidth/battery).
 - **Telemetry-beacon blocker** *(opt-in, off by default)*: a small static
   declarativeNetRequest ruleset ([dnr/yt-beacons.json](dnr/yt-beacons.json))
   blocks YouTube's playback/interaction telemetry (log_event, qoe, atr,
-  ptracking, gen_204…). Watch-history reporting (`api/stats/watchtime`) is
-  deliberately NOT blocked so your own YouTube history keeps working.
+  ptracking, gen_204, api/stats/ads…). Watch-history reporting
+  (`api/stats/watchtime`) is deliberately NOT blocked so your own YouTube
+  history keeps working.
 
 Zero telemetry. Zero runtime network requests. All data in
 `browser.storage.local`, exportable/importable as a single JSON backup
@@ -60,10 +66,11 @@ Zero telemetry. Zero runtime network requests. All data in
 |---|---|
 | `storage` | Watched-video map and settings in `storage.local`; the session hidden-counter in `storage.session`. |
 | `clipboardWrite` | The share dialog's Copy button copies from YouTube's internal data model, not the visible input — this lets the link cleaner overwrite the clipboard with the cleaned URL right after. Only used inside that click flow. |
-| `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 8 static rules scoped to youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
+| `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 9 static rules scoped to youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
 
-Content scripts run only on `*://www.youtube.com/*` via
-`content_scripts.matches` — this needs no separate host permission grant.
+Content scripts run on `*://www.youtube.com/*` and
+`*://music.youtube.com/*` via `content_scripts.matches` — this needs no
+separate host permission grant.
 Not requested: `tabs`, `webRequest`, host permissions, or anything else.
 
 `m.youtube.com` is deliberately **not** matched. The mobile site builds its
@@ -81,6 +88,7 @@ content/shared.js          all YouTube DOM assumptions (selectors, ID parsing,
 content/url-privacy.js     copy/share tracking-param stripping
 content/youtube-player.js  timeupdate watch tracking + SPA nav re-attachment
 content/youtube-feed.js    MutationObserver → idle-batched card filtering
+content/still-watching.js  opt-in "Are you still watching?" auto-dismisser
 background/service-worker.js  message hub; the ONLY writer of storage;
                            auto-purge; DNR ruleset toggle
 dnr/yt-beacons.json        opt-in telemetry-blocking ruleset (static, packaged)
