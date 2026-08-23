@@ -1,7 +1,7 @@
 {
   "name": "feedcleaner",
   "private": true,
-  "version": "0.4.1",
+  "version": "5.0",
   "type": "module",
   "description": "Dev/test harness only — the extension itself has zero build step and zero runtime dependencies.",
   "scripts": {
