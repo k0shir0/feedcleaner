@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadFeedEnvironment } from "./helpers.mjs";
+import { loadFeedEnvironment, FakeElement } from "./helpers.mjs";
 
 /** Build a YouTube-shaped confirm dialog inside a popup container. */
 function buildDialog({ host = "yt-confirm-dialog-renderer", withButton = true } = {}) {
