@@ -270,6 +270,7 @@ export function loadFeedEnvironment({
   watched = [],
   seen = {}, // { videoId: count } or { videoId: [count, ts] }
   pathname = "/",
+  hostname = "www.youtube.com",
   loadFeedModule = true,
   extraModules = [], // e.g. ["still-watching.js"] — loaded after state is applied
   sendMessageImpl,
@@ -298,7 +299,7 @@ export function loadFeedEnvironment({
     console,
     document,
     window,
-    location: { pathname, href: "https://www.youtube.com/", origin: "https://www.youtube.com" },
+    location: { pathname, href: `https://${hostname}${pathname}`, origin: `https://${hostname}`, hostname },
     browser,
     // WHATWG globals are per-context in Node's vm — inject what the
     // extension code uses (cleanUrl's `new URL`, URLSearchParams).

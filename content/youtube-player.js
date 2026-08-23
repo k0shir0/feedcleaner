@@ -13,7 +13,14 @@
 "use strict";
 
 (() => {
-  const { store, parseVideoIdFromUrl, findPlayerVideo } = YTWash;
+  const { store, parseVideoIdFromUrl, findPlayerVideo, IS_YOUTUBE_MUSIC } = YTWash;
+
+  // Host policy (see shared.js): watching on YouTube Music must never mark
+  // the matching YouTube video as watched — otherwise listening to a song
+  // there hides that video from the www.youtube.com feed later.
+  if (IS_YOUTUBE_MUSIC) {
+    return;
+  }
 
   // Per-page-session guard: IDs already reported. Without this, Shorts —
   // which loop forever — would re-fire past the threshold on every loop

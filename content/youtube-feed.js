@@ -21,10 +21,18 @@
 "use strict";
 
 (() => {
-  const { store, CARD_SELECTOR, SHELF_SELECTOR, extractCardInfo, extractVideoId } = YTWash;
+  const { store, CARD_SELECTOR, SHELF_SELECTOR, extractCardInfo, extractVideoId, IS_YOUTUBE_MUSIC } = YTWash;
 
   const HOST_CLASS = "ytwash-placeholder-host";
   const PLACEHOLDER_CLASS = "ytwash-placeholder";
+
+  // Host policy (see shared.js): YouTube Music gets privacy features only.
+  // This module never hides cards there, no matter what the DOM matches —
+  // a guard here beats trusting ytd-*/yt-lockup-* selectors to never match
+  // YTM markup.
+  if (IS_YOUTUBE_MUSIC) {
+    return;
+  }
 
   // Categorical hides (channel/keyword/duration/mix/live/premiere/shorts)
   // the user overrode with "Show anyway" — page-session only, no storage.

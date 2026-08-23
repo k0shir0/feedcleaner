@@ -76,6 +76,21 @@ const YTWash = (() => {
 
   const VIDEO_ID_RE = /^[\w-]{6,20}$/;
 
+  /**
+   * Host policy flag: music.youtube.com gets PRIVACY FEATURES ONLY.
+   *
+   * FeedCleaner never hides video cards and never records watch progress on
+   * YouTube Music — filtering/tracking modules must check this before acting.
+   * The privacy modules (url-privacy.js, dnr beacon ruleset, and the
+   * still-watching dismisser) deliberately do NOT check it: link cleaning,
+   * telemetry blocking, and the inactivity-prompt bypass are wanted on both
+   * sites. See README "YouTube Music policy".
+   *
+   * This makes "no blocking on YTM" explicit instead of relying on YouTube's
+   * desktop selectors never drifting onto YTM's markup.
+   */
+  const IS_YOUTUBE_MUSIC = location.hostname === "music.youtube.com";
+
   // Query params that only exist to track how a link was shared/reached.
   // Functional params (v, t, list…) are never touched. utm_* are the
   // standard campaign-tracking family (never functional on watch URLs);
@@ -355,6 +370,7 @@ const YTWash = (() => {
     CARD_SELECTOR,
     CARD_SELECTORS,
     SHELF_SELECTOR,
+    IS_YOUTUBE_MUSIC,
     parseVideoIdFromUrl,
     extractVideoId,
     extractCardInfo,
