@@ -77,7 +77,9 @@ const YTWash = (() => {
   const VIDEO_ID_RE = /^[\w-]{6,20}$/;
 
   // Query params that only exist to track how a link was shared/reached.
-  // Functional params (v, t, list…) are never touched.
+  // Functional params (v, t, list…) are never touched. utm_* are the
+  // standard campaign-tracking family (never functional on watch URLs);
+  // the rest are YouTube's own share/referral trackers.
   const TRACKING_PARAMS = [
     "si",
     "feature",
@@ -87,6 +89,12 @@ const YTWash = (() => {
     "source_ve_path",
     "gclid",
     "fbclid",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "utm_id",
   ];
 
   /**

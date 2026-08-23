@@ -78,5 +78,15 @@
       "initiatorDomains": ["youtube.com"],
       "resourceTypes": ["xmlhttprequest", "ping", "beacon", "image", "other"]
     }
+  },
+  {
+    "id": 9,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "||youtube.com/api/stats/ads",
+      "initiatorDomains": ["youtube.com"],
+      "resourceTypes": ["xmlhttprequest", "ping", "beacon", "image", "other"]
+    }
   }
 ]

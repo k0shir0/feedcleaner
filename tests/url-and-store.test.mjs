@@ -23,6 +23,11 @@ test("cleanUrl strips tracking params and keeps functional ones", () => {
   );
   // youtu.be shape
   assert.equal(cleanUrl("https://youtu.be/dQw4w9WgXcQ?si=q"), "https://youtu.be/dQw4w9WgXcQ");
+  // utm_* campaign family stripped (Feature #4)
+  assert.equal(
+    cleanUrl("https://www.youtube.com/watch?v=abc&utm_source=newsletter&utm_campaign=x"),
+    "https://www.youtube.com/watch?v=abc"
+  );
   // non-YouTube untouched → null; no params → null
   assert.equal(cleanUrl("https://example.com/?si=a"), null);
   assert.equal(cleanUrl("https://www.youtube.com/watch?v=x"), null);
