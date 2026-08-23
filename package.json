@@ -1,0 +1,15 @@
+{
+  "name": "feedcleaner",
+  "private": true,
+  "version": "0.4.1",
+  "type": "module",
+  "description": "Dev/test harness only — the extension itself has zero build step and zero runtime dependencies.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "lint": "web-ext lint --source-dir .",
+    "build": "web-ext build --source-dir ."
+  },
+  "devDependencies": {
+    "web-ext": "^10.6.0"
+  }
+}

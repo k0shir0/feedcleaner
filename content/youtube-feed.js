@@ -77,12 +77,26 @@
     // Rule-based hides can lack a video ID (nothing to key a placeholder
     // button on) — hard-hide those regardless of placeholder mode.
     const mode = store.settings.placeholderMode && videoId ? "placeholder" : "hard";
-    if (
+    const alreadyApplied =
       card.dataset.ytwashState === mode &&
       card.dataset.ytwashId === (videoId || "") &&
       card.dataset.ytwashReason === reason &&
-      card.dataset.ytwashLabel === label
-    ) {
+      card.dataset.ytwashLabel === label;
+
+    // Placeholder mode relies on our child surviving inside YouTube's card.
+    // YouTube re-renders card innards in place; when it removes/replaces our
+    // placeholder child, the host CSS ("hide everything except the
+    // placeholder") turns the card into an EMPTY TILE while the dataset
+    // guard below keeps reporting "already hidden". Verify the child before
+    // trusting the guard, and rebuild it when it went missing.
+    if (alreadyApplied) {
+      if (
+        mode !== "placeholder" ||
+        card.querySelector(`:scope > .${PLACEHOLDER_CLASS}`)
+      ) {
+        return false;
+      }
+      card.appendChild(buildPlaceholder(videoId, reason, label));
       return false;
     }
 
@@ -107,6 +121,8 @@
     if (!card.dataset.ytwashState) return;
     card.style.removeProperty("display");
     card.classList.remove(HOST_CLASS);
+    // :scope > so a placeholder nested by YouTube's own re-render (not ours)
+    // can never make us skip cleanup of THIS card's state.
     card.querySelector(`:scope > .${PLACEHOLDER_CLASS}`)?.remove();
     delete card.dataset.ytwashState;
     delete card.dataset.ytwashId;
@@ -331,6 +347,23 @@
     } else {
       setTimeout(run, 50);
     }
+  }
+
+  // Test hook (tests/ drive these directly): inert in production — the
+  // global is only set by the Node test runner. Exposes pure decision and
+  // card-state logic without changing any runtime behavior.
+  if (globalThis.__FEEDCLEANER_TEST__) {
+    globalThis.__FEEDCLEANER_TEST_API__ = {
+        decideCard,
+        hideCard,
+        showCard,
+        runFilterPass,
+        compileMatchers,
+        isHistoryPage,
+        getSettings: () => store.settings,
+        setSeenSnapshot: (m) => (seenSnapshot = new Map(m)),
+        getSessionReveals: () => sessionReveals,
+      };
   }
 
   store.ready().then(() => {

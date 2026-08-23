@@ -217,6 +217,7 @@ const YTWash = (() => {
       stripLinks: true,
       purgeDays: 0,
       beaconBlockEnabled: false,
+      stillWatchingEnabled: false,
       hideShorts: false,
       hideMixes: false,
       hideLive: false,
@@ -268,7 +269,17 @@ const YTWash = (() => {
       this._notify();
     },
 
-    /** Idempotent init: first refresh + change listener + fallback poll. */
+    /**
+     * Idempotent init: first refresh + change listener + fallback poll.
+     *
+     * The initial refresh round-trips to the background event page, which
+     * Firefox may still be starting when a YouTube tab loads (cold start).
+     * A single failed sendMessage used to leave the cache empty and silent
+     * until the next 30 s poll — the "extension only starts after clicking
+     * the popup" report (the popup click is what spawns the background).
+     * The retry below keeps init event-driven while making the first fetch
+     * survive that race; failures stay logged instead of invisible.
+     */
     ready() {
       if (!this._ready) {
         // Consume change payloads directly — no message round-trips. The
@@ -304,9 +315,29 @@ const YTWash = (() => {
           this._notify(info);
         });
         setInterval(() => this.refresh().catch(() => {}), 30_000);
-        this._ready = this.refresh().catch((e) => {
-          console.warn("[FeedCleaner] initial state fetch failed", e);
-        });
+        // Bounded retry for the cold-start race (see comment above): the
+        // first fetch can hit a background page that is still starting up.
+        // Retries are event-ish (short, finite, backoff) — not a "wait and
+        // hope" timer; the moment one attempt succeeds, init completes.
+        const RETRY_DELAYS_MS = [250, 1000, 3000];
+        this._ready = (async () => {
+          for (let attempt = 0; ; attempt++) {
+            try {
+              await this.refresh();
+              return;
+            } catch (e) {
+              if (attempt >= RETRY_DELAYS_MS.length) {
+                console.warn("[FeedCleaner] initial state fetch failed", e);
+                return;
+              }
+              console.warn(
+                `[FeedCleaner] initial fetch attempt ${attempt + 1} failed, retrying`,
+                e
+              );
+              await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+            }
+          }
+        })();
       }
       return this._ready;
     },
