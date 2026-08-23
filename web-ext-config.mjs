@@ -9,10 +9,14 @@ export default {
   ignoreFiles: [
     "build",
     "docs",
+    "e2e",
     "filter-lists",
+    "tests",
     "README.md",
     "LICENSE",
     "web-ext-config.mjs",
+    "package.json",
+    "package-lock.json",
   ],
   build: {
     overwriteDest: true,
