@@ -9,6 +9,7 @@ const BOOL_SETTINGS = [
   "repeatEnabled",
   "stripLinks",
   "beaconBlockEnabled",
+  "stillWatchingEnabled",
   "hideShorts",
   "hideMixes",
   "hideLive",

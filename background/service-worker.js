@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   stripLinks: true, // strip tracking params from copied/shared YT links
   purgeDays: 0, // auto-forget watched/seen entries older than N days; 0 = never
   beaconBlockEnabled: false, // opt-in: enable the yt-beacons DNR ruleset
+  stillWatchingEnabled: false, // opt-in: auto-dismiss "Are you still watching?"
   hideShorts: false, // hide Shorts shelves and /shorts/ cards
   hideMixes: false, // hide Mix / algorithmic radio cards
   hideLive: false, // hide live-stream cards
@@ -105,6 +106,7 @@ function sanitizeSettings(patch) {
     "repeatEnabled",
     "stripLinks",
     "beaconBlockEnabled",
+    "stillWatchingEnabled",
     "hideShorts",
     "hideMixes",
     "hideLive",

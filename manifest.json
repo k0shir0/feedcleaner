@@ -38,7 +38,8 @@
         "content/shared.js",
         "content/url-privacy.js",
         "content/youtube-player.js",
-        "content/youtube-feed.js"
+        "content/youtube-feed.js",
+        "content/still-watching.js"
       ],
       "css": ["content/feedcleaner.css"],
       "run_at": "document_idle"
