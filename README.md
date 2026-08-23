@@ -45,6 +45,20 @@ Zero telemetry. Zero runtime network requests. All data in
 `browser.storage.local`, exportable/importable as a single JSON backup
 (settings + watched list with dates + sighting counts).
 
+## YouTube Music policy
+
+`music.youtube.com` is covered for **privacy features only**:
+
+- **Active there:** link cleaning, the opt-in telemetry-beacon blocker, and
+  the "Are you still watching?" bypass.
+- **Never active there:** feed filtering and watch tracking. Listening to a
+  song on YouTube Music does not mark the matching video watched on YouTube,
+  and no card is ever hidden on YouTube Music.
+- This is enforced in code (`IS_YOUTUBE_MUSIC` in `content/shared.js`;
+  the feed and player modules exit early on that host) rather than by
+  trusting desktop selectors to never match YouTube Music markup, and pinned
+  by `tests/ytm-policy.test.mjs`.
+
 
 
 ## **The extension in action on the youtube home page**
@@ -59,14 +73,13 @@ Zero telemetry. Zero runtime network requests. All data in
 
 
 
-
 ## Permissions — why each one is requested
 
 | Permission | Why |
 |---|---|
 | `storage` | Watched-video map and settings in `storage.local`; the session hidden-counter in `storage.session`. |
 | `clipboardWrite` | The share dialog's Copy button copies from YouTube's internal data model, not the visible input — this lets the link cleaner overwrite the clipboard with the cleaned URL right after. Only used inside that click flow. |
-| `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 9 static rules scoped to youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
+| `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 9 static rules scoped to youtube.com + music.youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
 
 Content scripts run on `*://www.youtube.com/*` and
 `*://music.youtube.com/*` via `content_scripts.matches` — this needs no
@@ -120,7 +133,8 @@ auto-purge). `seenCounts` is `{ videoId: [count, lastSeenMs] }`.
   (disclosed in the AMO description; toggle in settings).
 - Optional auto-purge forgets watched/seen entries older than N days.
 - The telemetry-beacon blocker is opt-in and ships disabled; its ruleset is
-  static, human-readable, and scoped to requests initiated by youtube.com.
+  static, human-readable, and scoped to requests initiated by YouTube's own
+  domains (`youtube.com` / `music.youtube.com`).
 
 ## License
 
