@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "FeedCleaner",
+    "description": "Extension name shown in the add-ons manager and toolbar."
+  },
+  "extensionDescription": {
+    "message": "Cleans your YouTube feed and your links: hides videos you've already watched or that keep reappearing, and strips tracking parameters (si=, feature=) from links you copy or share. Optional filters hide Shorts, Mixes, live streams, premieres, short videos, blocked channels, and title keywords; optional telemetry-beacon blocking (off by default). Private by design: no telemetry of its own, everything stays in local storage.",
+    "description": "Extension description shown in the add-ons manager."
+  }
+}

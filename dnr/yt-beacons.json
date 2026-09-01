@@ -1,0 +1,191 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/youtubei/v1/log_event",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/api/stats/qoe",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/api/stats/atr",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/ptracking",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 5,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/gen_204",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 6,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/generate_204",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 7,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/csi_204",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 8,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||play.google.com/log",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  },
+  {
+    "id": 9,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||youtube.com/api/stats/ads",
+      "initiatorDomains": [
+        "youtube.com",
+        "music.youtube.com"
+      ],
+      "resourceTypes": [
+        "xmlhttprequest",
+        "ping",
+        "beacon",
+        "image",
+        "other"
+      ]
+    }
+  }
+]
