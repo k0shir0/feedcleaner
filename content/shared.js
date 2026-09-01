@@ -163,7 +163,8 @@ const YTWash = (() => {
   /** Extract the video ID a feed card points at, or null. */
   function extractVideoId(cardEl) {
     const anchor = cardEl.querySelector(CARD_ANCHOR_SELECTOR);
-    return anchor ? parseVideoIdFromUrl(anchor.getAttribute("href")) : null;
+    const href = anchor ? (anchor.getAttribute("href") || anchor.href || "") : "";
+    return href ? parseVideoIdFromUrl(href) : null;
   }
 
   /**
@@ -173,7 +174,7 @@ const YTWash = (() => {
    */
   function extractCardInfo(cardEl) {
     const anchor = cardEl.querySelector(CARD_ANCHOR_SELECTOR);
-    const href = anchor ? anchor.getAttribute("href") || "" : "";
+    const href = anchor ? (anchor.getAttribute("href") || anchor.href || "") : "";
 
     const titleEl = cardEl.querySelector(CARD_TITLE_SELECTOR);
 
@@ -182,7 +183,7 @@ const YTWash = (() => {
     const chanLink = cardEl.querySelector(CARD_CHANNEL_LINK_SELECTOR);
     if (chanLink) {
       channelName = chanLink.textContent.trim() || null;
-      const chanHref = chanLink.getAttribute("href") || "";
+      const chanHref = chanLink.getAttribute("href") || chanLink.href || "";
       const m = /^\/(@[\w.-]+)|^\/channel\/(UC[\w-]+)/.exec(chanHref);
       if (m) channelHandle = (m[1] || m[2]).toLowerCase();
     } else {
@@ -202,7 +203,7 @@ const YTWash = (() => {
     }
 
     return {
-      videoId: anchor ? parseVideoIdFromUrl(href) : null,
+      videoId: href ? parseVideoIdFromUrl(href) : null,
       title: titleEl ? titleEl.textContent.trim() : null,
       channelHandle,
       channelName,
@@ -278,37 +279,53 @@ const YTWash = (() => {
     },
 
     async refresh() {
-      const [state, idsResponse] = await Promise.all([
-        browser.runtime.sendMessage({ type: "GET_STATE" }),
-        browser.runtime.sendMessage({ type: "GET_WATCHED_IDS" }),
-      ]);
-      if (state && state.settings) this.settings = state.settings;
-      if (idsResponse && Array.isArray(idsResponse.watchedIds)) {
-        this.watched = new Set(idsResponse.watchedIds);
+      try {
+        const { settings, watched, seenCounts } = await browser.storage.local.get([
+          "settings",
+          "watched",
+          "seenCounts",
+        ]);
+        if (settings && typeof settings === "object") {
+          this.settings = { ...this.settings, ...settings };
+        }
+        if (watched && typeof watched === "object") {
+          this.watched = new Set(Object.keys(watched));
+        }
+        if (seenCounts && typeof seenCounts === "object") {
+          const seen = new Map();
+          for (const [id, entry] of Object.entries(seenCounts)) {
+            seen.set(id, Array.isArray(entry) ? entry[0] : entry);
+          }
+          this.seen = seen;
+        }
+        this._notify();
+      } catch {
+        try {
+          const [state, idsResponse] = await Promise.all([
+            browser.runtime.sendMessage({ type: "GET_STATE" }),
+            browser.runtime.sendMessage({ type: "GET_WATCHED_IDS" }),
+          ]);
+          if (state && state.settings) this.settings = state.settings;
+          if (idsResponse && Array.isArray(idsResponse.watchedIds)) {
+            this.watched = new Set(idsResponse.watchedIds);
+          }
+          if (idsResponse && idsResponse.seenCounts && typeof idsResponse.seenCounts === "object") {
+            this.seen = new Map(Object.entries(idsResponse.seenCounts));
+          }
+          this._notify();
+        } catch (e) {
+          console.warn("[FeedCleaner] refresh fallback failed", e);
+        }
       }
-      if (idsResponse && idsResponse.seenCounts && typeof idsResponse.seenCounts === "object") {
-        this.seen = new Map(Object.entries(idsResponse.seenCounts));
-      }
-      this._notify();
     },
 
     /**
-     * Idempotent init: first refresh + change listener + fallback poll.
-     *
-     * The initial refresh round-trips to the background event page, which
-     * Firefox may still be starting when a YouTube tab loads (cold start).
-     * A single failed sendMessage used to leave the cache empty and silent
-     * until the next 30 s poll — the "extension only starts after clicking
-     * the popup" report (the popup click is what spawns the background).
-     * The retry below keeps init event-driven while making the first fetch
-     * survive that race; failures stay logged instead of invisible.
+     * Idempotent init: direct storage read + change listener + fallback poll.
+     * Content scripts have read access to browser.storage.local directly,
+     * so init requires zero round-trips to sleeping background workers.
      */
     ready() {
       if (!this._ready) {
-        // Consume change payloads directly — no message round-trips. The
-        // background stays the only writer; this is read-only intake, and
-        // it fires every ~2s during scrolling (SEEN_BATCH flushes), so it
-        // must be cheap.
         browser.storage.onChanged.addListener((changes, area) => {
           if (area !== "local") return;
           const info = {
@@ -338,29 +355,7 @@ const YTWash = (() => {
           this._notify(info);
         });
         setInterval(() => this.refresh().catch(() => {}), 30_000);
-        // Bounded retry for the cold-start race (see comment above): the
-        // first fetch can hit a background page that is still starting up.
-        // Retries are event-ish (short, finite, backoff) — not a "wait and
-        // hope" timer; the moment one attempt succeeds, init completes.
-        const RETRY_DELAYS_MS = [250, 1000, 3000];
-        this._ready = (async () => {
-          for (let attempt = 0; ; attempt++) {
-            try {
-              await this.refresh();
-              return;
-            } catch (e) {
-              if (attempt >= RETRY_DELAYS_MS.length) {
-                console.warn("[FeedCleaner] initial state fetch failed", e);
-                return;
-              }
-              console.warn(
-                `[FeedCleaner] initial fetch attempt ${attempt + 1} failed, retrying`,
-                e
-              );
-              await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
-            }
-          }
-        })();
+        this._ready = this.refresh();
       }
       return this._ready;
     },

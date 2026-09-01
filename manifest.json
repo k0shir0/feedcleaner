@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "__MSG_extensionName__",
   "description": "__MSG_extensionDescription__",
-  "version": "5.0",
+  "version": "6.0",
   "default_locale": "en_US",
 
   "browser_specific_settings": {
@@ -16,6 +16,12 @@
   },
 
   "permissions": ["storage", "clipboardWrite", "declarativeNetRequest"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://youtube.com/*",
+    "*://www.youtube.com/*",
+    "*://music.youtube.com/*"
+  ],
 
   "declarative_net_request": {
     "rule_resources": [

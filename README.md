@@ -80,11 +80,17 @@ Zero telemetry. Zero runtime network requests. All data in
 | `storage` | Watched-video map and settings in `storage.local`; the session hidden-counter in `storage.session`. |
 | `clipboardWrite` | The share dialog's Copy button copies from YouTube's internal data model, not the visible input — this lets the link cleaner overwrite the clipboard with the cleaned URL right after. Only used inside that click flow. |
 | `declarativeNetRequest` | The opt-in telemetry-beacon ruleset (`dnr/yt-beacons.json`, 9 static rules scoped to youtube.com + music.youtube.com initiators, disabled by default). No dynamic rules, no other sites. |
+| `host_permissions` (`youtube.com`) | Scoped strictly to YouTube and YouTube Music domains to allow continuous feed filtering without requiring click-to-run activation. |
 
-Content scripts run on `*://www.youtube.com/*` and
-`*://music.youtube.com/*` via `content_scripts.matches` — this needs no
-separate host permission grant.
-Not requested: `tabs`, `webRequest`, host permissions, or anything else.
+### Note on Firefox Permissions ("Always Allow on YouTube")
+
+In modern Firefox (Manifest V3), extensions default to **"Only When Clicked"** for your security until site access is approved.
+
+This means you can use FeedCleaner in two ways:
+- **On-Demand**: Click the FeedCleaner icon on your toolbar whenever you visit YouTube to activate filtering for that session.
+- **Always-On (Recommended)**: If you want FeedCleaner to automatically filter watched videos the moment YouTube opens without needing a click:
+  1. Right-click the FeedCleaner icon on YouTube and select **"Always Allow on www.youtube.com"**, OR
+  2. Open the FeedCleaner **Settings** page and click **"Check / Grant Access"**.
 
 `m.youtube.com` is deliberately **not** matched. The mobile site builds its
 feed from `ytm-*` custom elements and this codebase only knows the desktop

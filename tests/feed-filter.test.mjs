@@ -151,3 +151,38 @@ test("rule-based hide without video ID falls back to hard-hide (nothing to key a
   assert.equal(shelf.dataset.ytwashState, "hard");
   void store;
 });
+
+test("nested cards: runFilterPass ignores inner lockup when wrapped by outer renderer", () => {
+  const { api, document } = env({ watched: ["nested123"] });
+  const outer = new FakeElement("ytd-rich-item-renderer");
+  const inner = new FakeElement("yt-lockup-view-model");
+  const anchor = new FakeElement("a");
+  anchor.setAttribute("href", "/watch?v=nested123");
+  inner.appendChild(anchor);
+  outer.appendChild(inner);
+  document.body.appendChild(outer);
+
+  api.runFilterPass();
+
+  // Outer container is hidden/placeholder
+  assert.equal(outer.dataset.ytwashState, "placeholder");
+  // Inner container is NOT touched (preventing duplicate placeholders / double counting)
+  assert.equal(inner.dataset.ytwashState, undefined);
+});
+
+test("skeleton card hydration: unhydrated skeleton is not observed until video ID attaches", () => {
+  const { api, document, YTWash } = env({ settings: { repeatEnabled: true } });
+  const skeleton = new FakeElement("ytd-rich-item-renderer");
+  document.body.appendChild(skeleton);
+
+  api.runFilterPass();
+  assert.equal(YTWash.extractVideoId(skeleton), null);
+
+  // Now attach anchor (hydration)
+  const anchor = new FakeElement("a");
+  anchor.setAttribute("href", "/watch?v=hydrated123");
+  skeleton.appendChild(anchor);
+
+  api.runFilterPass();
+  assert.equal(YTWash.extractVideoId(skeleton), "hydrated123");
+});

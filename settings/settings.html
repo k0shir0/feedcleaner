@@ -58,7 +58,17 @@
     </section>
 
     <section>
-      <h2>Privacy</h2>
+      <h2>Privacy & Permissions</h2>
+
+      <div class="field row">
+        <label for="grantSitePermission">
+          Always-on access (allows FeedCleaner to filter YouTube automatically on page load without needing to click the extension icon)
+        </label>
+        <button id="grantSitePermission" type="button">Grant Access</button>
+      </div>
+      <p class="hint" id="permissionStatusHint">
+        In Firefox MV3, extensions default to "Only When Clicked". Granting persistent access ensures watched videos are hidden automatically when YouTube opens.
+      </p>
 
       <div class="field row">
         <label for="stripLinks">

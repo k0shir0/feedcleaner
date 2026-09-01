@@ -104,6 +104,24 @@ export class FakeElement {
   }
   removeEventListener() {}
 
+  get parentElement() {
+    return this.parentNode;
+  }
+
+  matches(sel) {
+    const alternatives = parseSelectorList(sel);
+    return alternatives.some((seq) => matchSequence(this, seq, null));
+  }
+
+  closest(sel) {
+    let cur = this;
+    while (cur && cur.tagName) {
+      if (cur.matches(sel)) return cur;
+      cur = cur.parentNode;
+    }
+    return null;
+  }
+
   querySelector(sel) {
     return querySelectorAll(this, sel)[0] ?? null;
   }
@@ -237,7 +255,7 @@ export function querySelectorAll(root, selector) {
 
 /* ----------------------------- fake browser ----------------------------- */
 
-export function makeBrowser(sendImpl) {
+export function makeBrowser(sendImpl, storageInitial = {}) {
   const sent = [];
   const impl = sendImpl || ((msg) => {
     sent.push(msg);
@@ -245,13 +263,30 @@ export function makeBrowser(sendImpl) {
   });
   const sendMessage = (msg) => impl(msg);
   sendMessage._sent = sent;
+  const storageData = { ...storageInitial };
   return {
     runtime: {
       sendMessage,
       onMessage: { addListener() {} },
     },
     storage: {
-      local: { get: async () => ({}), set: async () => {}, remove: async () => {} },
+      local: {
+        get: async (keys) => {
+          if (Array.isArray(keys)) {
+            const res = {};
+            for (const k of keys) if (k in storageData) res[k] = storageData[k];
+            return res;
+          }
+          if (typeof keys === "string") return { [keys]: storageData[keys] };
+          return { ...storageData };
+        },
+        set: async (obj) => {
+          Object.assign(storageData, obj);
+        },
+        remove: async (key) => {
+          delete storageData[key];
+        },
+      },
       session: { get: async () => ({}), set: async () => {} },
       onChanged: { addListener() {} },
     },
@@ -293,7 +328,17 @@ export function loadFeedEnvironment({
     t.unref?.();
     return t;
   };
-  const browser = makeBrowser(sendMessageImpl);
+  const storageData = {
+    settings: { ...settings },
+    watched: Object.fromEntries(watched.map((id) => [id, Date.now()])),
+    seenCounts: Object.fromEntries(
+      (seen instanceof Map ? [...seen.entries()] : Object.entries(seen ?? {})).map(([id, v]) => [
+        id,
+        Array.isArray(v) ? v : [v, Date.now()],
+      ])
+    ),
+  };
+  const browser = makeBrowser(sendMessageImpl, storageData);
 
   const sandbox = {
     console,

@@ -269,6 +269,60 @@ $("importFile").addEventListener("change", async (e) => {
   }
 });
 
+/* ---------------------------- site permissions -------------------------- */
+
+const YOUTUBE_ORIGINS = [
+  "*://*.youtube.com/*",
+  "*://youtube.com/*",
+  "*://www.youtube.com/*",
+  "*://music.youtube.com/*",
+];
+
+async function checkSitePermissions() {
+  if (!browser.permissions?.contains) return;
+  try {
+    const hasAccess = await browser.permissions.contains({
+      origins: ["*://*.youtube.com/*", "*://youtube.com/*", "*://www.youtube.com/*"],
+    });
+    const btn = $("grantSitePermission");
+    const hint = $("permissionStatusHint");
+    if (btn) {
+      btn.disabled = false;
+      if (hasAccess) {
+        btn.textContent = "Revoke Access";
+        btn.title = "Click to revoke persistent always-on access and revert to 'Only When Clicked'";
+      } else {
+        btn.textContent = "Grant Access";
+        btn.title = "Click to grant persistent always-on access";
+      }
+    }
+    if (hint) {
+      hint.textContent = hasAccess
+        ? "Persistent access is granted. Click 'Revoke Access' if you wish to revert to on-demand activation."
+        : "In Firefox MV3, extensions default to 'Only When Clicked'. Granting persistent access ensures watched videos are hidden automatically when YouTube opens.";
+    }
+  } catch {}
+}
+
+$("grantSitePermission")?.addEventListener("click", async () => {
+  if (!browser.permissions) return;
+  try {
+    const hasAccess = await browser.permissions.contains({
+      origins: ["*://*.youtube.com/*", "*://youtube.com/*", "*://www.youtube.com/*"],
+    }).catch(() => false);
+
+    if (hasAccess) {
+      if (confirm("Revoke always-on access for YouTube? FeedCleaner will only run when clicked in the toolbar.")) {
+        const removed = await browser.permissions.remove({ origins: YOUTUBE_ORIGINS }).catch(() => false);
+        if (removed) checkSitePermissions();
+      }
+    } else {
+      const granted = await browser.permissions.request({ origins: YOUTUBE_ORIGINS }).catch(() => false);
+      if (granted) checkSitePermissions();
+    }
+  } catch {}
+});
+
 /* ------------------------------ live updates ---------------------------- */
 
 browser.storage.onChanged.addListener((changes, area) => {
@@ -276,3 +330,4 @@ browser.storage.onChanged.addListener((changes, area) => {
 });
 
 loadState();
+checkSitePermissions();

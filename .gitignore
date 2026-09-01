@@ -5,3 +5,6 @@ filter-lists/rules.json
 web-ext-artifacts/
 
 node_modules/
+
+# graphify (read-only codebase analysis) — never commit its output
+graphify-out/

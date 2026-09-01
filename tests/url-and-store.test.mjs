@@ -42,44 +42,45 @@ test("cleanUrl strips tracking params and keeps functional ones", () => {
   assert.equal(parseDurationText("LIVE"), null);
 });
 
-test("REGRESSION (Bug #1): store.ready() retries when the background is unreachable at cold start", async () => {
+test("REGRESSION (Bug #1): store.ready() initializes directly from storage.local without background dependency", async () => {
+  const { store } = loadFeedEnvironment({
+    loadFeedModule: false,
+    watched: ["dQw4w9WgXcQ"],
+    settings: { threshold: 0.9 },
+  });
+
+  await store.ready();
+  assert.equal(store.settings.threshold, 0.9);
+  assert.ok(store.watched.has("dQw4w9WgXcQ"));
+});
+
+test("REGRESSION (Bug #1): store.ready() uses fallback messaging when storage.local is unavailable", async () => {
   let calls = 0;
-  const { store } = loadStoreEnvironment({
-    sendMessageImpl: () => {
+  const { store, browser } = loadStoreEnvironment({
+    sendMessageImpl: (msg) => {
       calls++;
-      if (calls <= 2) return Promise.reject(new Error("Could not establish connection"));
+      if (msg.type === "GET_STATE") return Promise.resolve({ settings: { threshold: 0.85 } });
+      if (msg.type === "GET_WATCHED_IDS") return Promise.resolve({ watchedIds: ["abc12345678"] });
       return Promise.resolve({});
     },
   });
 
-  const t0 = Date.now();
-  await store.ready(); // must resolve despite the first two failures
-  assert.ok(calls >= 3, `expected >=3 attempts after 2 failures, got ${calls}`);
-  // Backoff schedule is 250 + 1000 ms before attempt #3 succeeds.
-  const elapsed = Date.now() - t0;
-  assert.ok(elapsed < 5000, `retry loop took too long: ${elapsed}ms`);
-});
+  // Simulate storage.local.get failure to test fallback
+  browser.storage.local.get = () => Promise.reject(new Error("Storage unavailable"));
 
-test("REGRESSION (Bug #1): store.ready() recovers after a single failure", async () => {
-  let calls = 0;
-  const { store } = loadStoreEnvironment({
-    sendMessageImpl: () => {
-      calls++;
-      return calls === 1 ? Promise.reject(new Error("boom")) : Promise.resolve({});
-    },
-  });
   await store.ready();
-  assert.ok(calls >= 2);
+  assert.ok(calls >= 2, "Fallback sendMessage was called");
+  assert.equal(store.settings.threshold, 0.85);
+  assert.ok(store.watched.has("abc12345678"));
 });
 
-test("REGRESSION (Bug #1): store.ready() still resolves when every attempt fails", async () => {
-  let calls = 0;
-  const { store } = loadStoreEnvironment({
-    sendMessageImpl: () => {
-      calls++;
-      return Promise.reject(new Error("dead background"));
-    },
+test("REGRESSION (Bug #1): store.ready() still resolves even if both storage and messaging fail", async () => {
+  const { store, browser } = loadStoreEnvironment({
+    sendMessageImpl: () => Promise.reject(new Error("Dead background")),
   });
-  await store.ready(); // bounded retry exhausts, logs, resolves anyway
-  assert.ok(calls >= 4); // initial + 3 retries
+
+  browser.storage.local.get = () => Promise.reject(new Error("Dead storage"));
+
+  await store.ready();
+  assert.ok(store.settings.masterEnabled);
 });

@@ -299,7 +299,16 @@
     let newlyHidden = 0;
 
     for (const card of cards) {
-      if (!observedCards.has(card)) {
+      // Skip inner card if nested inside another matching card container
+      if (card.parentElement?.closest?.(CARD_SELECTOR)) {
+        continue;
+      }
+
+      const info = extractCardInfo(card);
+
+      // Only mark as observed when the card has a video ID (hydrated).
+      // Unhydrated skeleton cards remain unobserved until their video ID is attached.
+      if (info.videoId && !observedCards.has(card)) {
         sightingObserver.observe(card);
         observedCards.add(card);
       }
@@ -310,7 +319,6 @@
       }
 
       // decideCard checks each module's own toggle internally.
-      const info = extractCardInfo(card);
       const decision = decideCard(info, s);
       if (decision) {
         if (hideCard(card, info.videoId, decision.reason, decision.label)) {
@@ -374,6 +382,9 @@
       };
   }
 
+  // Tracks IDs optimistically incremented at navigation time until storage catches up.
+  const optimisticSightings = new Set();
+
   store.ready().then(() => {
     seenSnapshot = new Map(store.seen);
     compileMatchers();
@@ -395,6 +406,12 @@
       let decreased = false;
       for (const [id, count] of seenSnapshot) {
         const live = store.seen.get(id) ?? 0;
+        if (optimisticSightings.has(id)) {
+          if (live >= count) {
+            optimisticSightings.delete(id);
+          }
+          continue;
+        }
         if (live < count) {
           seenSnapshot.set(id, live);
           decreased = true;
@@ -411,8 +428,11 @@
       // …so build the new snapshot optimistically: everything counted on
       // the page we're leaving has at least its prior count + 1 by now.
       const next = new Map(store.seen);
+      optimisticSightings.clear();
       for (const id of countedThisNav) {
-        next.set(id, Math.max(next.get(id) ?? 0, (seenSnapshot.get(id) ?? 0) + 1));
+        const newCount = Math.max(next.get(id) ?? 0, (seenSnapshot.get(id) ?? 0) + 1);
+        next.set(id, newCount);
+        optimisticSightings.add(id);
       }
       seenSnapshot = next;
       countedThisNav = new Set();

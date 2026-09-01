@@ -117,5 +117,13 @@
     }).observe(titleEl, { childList: true });
   }
 
+  store.onChange((info) => {
+    if (info?.watchedChanged) {
+      for (const id of reported) {
+        if (!store.watched.has(id)) reported.delete(id);
+      }
+    }
+  });
+
   store.ready().then(attachWhenReady);
 })();
