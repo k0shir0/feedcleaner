@@ -115,11 +115,11 @@ function sanitizeSettings(patch) {
     if (typeof patch[key] === "boolean") clean[key] = patch[key];
   }
   if (typeof patch.threshold === "number" && Number.isFinite(patch.threshold)) {
-    clean.threshold = Math.min(1, Math.max(0.5, patch.threshold));
+    clean.threshold = Math.max(0.5, patch.threshold);
   }
   if (typeof patch.repeatThreshold === "number" && Number.isFinite(patch.repeatThreshold)) {
-    // Bounds must match the settings-page range input (1–10).
-    clean.repeatThreshold = Math.min(10, Math.max(1, Math.round(patch.repeatThreshold)));
+    // Allow manual overrides above the slider range, with a sanity ceiling.
+    clean.repeatThreshold = Math.min(100000, Math.max(1, Math.round(patch.repeatThreshold)));
   }
   if (typeof patch.purgeDays === "number" && Number.isFinite(patch.purgeDays)) {
     clean.purgeDays = Math.min(365, Math.max(0, Math.round(patch.purgeDays)));

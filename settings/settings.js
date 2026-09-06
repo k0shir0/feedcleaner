@@ -29,11 +29,9 @@ async function loadState() {
   watchedIds = ids;
   currentSettings = settings;
 
-  $("threshold").value = String(Math.round(settings.threshold * 100));
-  $("thresholdValue").textContent = `${Math.round(settings.threshold * 100)}%`;
+  renderSliderValue(thresholdEditor, settings.threshold);
   for (const id of BOOL_SETTINGS) $(id).checked = settings[id];
-  $("repeatThreshold").value = String(settings.repeatThreshold);
-  $("repeatThresholdValue").textContent = formatTimes(settings.repeatThreshold);
+  renderSliderValue(repeatThresholdEditor, settings.repeatThreshold);
   $("purgeDays").value = String(settings.purgeDays);
   $("minDurationSec").value = String(settings.minDurationSec);
 
@@ -117,31 +115,104 @@ function formatTimes(n) {
 
 /* ------------------------------- settings ------------------------------- */
 
-$("repeatThreshold").addEventListener("input", () => {
-  $("repeatThresholdValue").textContent = formatTimes(Number($("repeatThreshold").value));
-});
+function renderSliderValue(editor, value) {
+  $(editor.sliderId).value = String(editor.toSliderValue(value));
+  $(editor.outputId).textContent = editor.format(value);
+}
 
-$("repeatThreshold").addEventListener("change", () => {
-  browser.runtime.sendMessage({
+async function saveSliderValue(editor, value) {
+  const { settings } = await browser.runtime.sendMessage({
     type: "SET_SETTINGS",
-    settings: { repeatThreshold: Number($("repeatThreshold").value) },
+    settings: { [editor.settingKey]: value },
   });
-});
+  currentSettings = settings;
+  renderSliderValue(editor, settings[editor.settingKey]);
+}
+
+function setupSliderValueEditor(editor) {
+  const slider = $(editor.sliderId);
+  const output = $(editor.outputId);
+  const input = $(editor.inputId);
+  const container = output.parentElement;
+  let editing = false;
+
+  output.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    editing = true;
+    input.value = String(editor.toInputValue(currentSettings[editor.settingKey]));
+    container.classList.add("editing");
+    input.focus();
+    input.select();
+  });
+
+  const commit = async () => {
+    if (!editing) return;
+    editing = false;
+    container.classList.remove("editing");
+
+    const rawValue = input.value.trim();
+    const inputValue = Number(rawValue);
+    if (!rawValue || !Number.isFinite(inputValue) || !Number.isInteger(inputValue)) {
+      renderSliderValue(editor, currentSettings[editor.settingKey]);
+      return;
+    }
+
+    try {
+      await saveSliderValue(editor, editor.fromInputValue(inputValue));
+    } catch {
+      renderSliderValue(editor, currentSettings[editor.settingKey]);
+    }
+  };
+
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+  });
+
+  slider.addEventListener("input", () => {
+    output.textContent = editor.format(editor.fromSliderValue(Number(slider.value)));
+  });
+  slider.addEventListener("change", () => {
+    saveSliderValue(editor, editor.fromSliderValue(Number(slider.value))).catch(() => {
+      renderSliderValue(editor, currentSettings[editor.settingKey]);
+    });
+  });
+}
+
+const thresholdEditor = {
+  settingKey: "threshold",
+  sliderId: "threshold",
+  outputId: "thresholdValue",
+  inputId: "thresholdValueInput",
+  format: (value) => `${Math.round(value * 100)}%`,
+  toSliderValue: (value) => Math.round(value * 100),
+  fromSliderValue: (value) => value / 100,
+  toInputValue: (value) => Math.round(value * 100),
+  fromInputValue: (value) => value / 100,
+};
+
+const repeatThresholdEditor = {
+  settingKey: "repeatThreshold",
+  sliderId: "repeatThreshold",
+  outputId: "repeatThresholdValue",
+  inputId: "repeatThresholdValueInput",
+  format: formatTimes,
+  toSliderValue: (value) => value,
+  fromSliderValue: (value) => value,
+  toInputValue: (value) => value,
+  fromInputValue: (value) => value,
+};
+
+setupSliderValueEditor(thresholdEditor);
+setupSliderValueEditor(repeatThresholdEditor);
 
 $("clearSeen").addEventListener("click", async () => {
   if (!confirm("Forget all sighting counts? Videos will only be hidden again after they reappear.")) return;
   await browser.runtime.sendMessage({ type: "CLEAR_SEEN" });
-});
-
-$("threshold").addEventListener("input", () => {
-  $("thresholdValue").textContent = `${$("threshold").value}%`;
-});
-
-$("threshold").addEventListener("change", () => {
-  browser.runtime.sendMessage({
-    type: "SET_SETTINGS",
-    settings: { threshold: Number($("threshold").value) / 100 },
-  });
 });
 
 for (const id of BOOL_SETTINGS) {
