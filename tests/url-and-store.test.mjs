@@ -5,7 +5,41 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
 import { loadFeedEnvironment, loadStoreEnvironment } from "./helpers.mjs";
+
+function loadBackgroundEnvironment(initialStorage = {}) {
+  const storage = { ...initialStorage };
+  let messageListener;
+  const browser = {
+    runtime: {
+      onMessage: { addListener: (listener) => { messageListener = listener; } },
+      onInstalled: { addListener() {} },
+    },
+    storage: {
+      local: {
+        get: async (keys) => {
+          if (typeof keys === "string") return { [keys]: storage[keys] };
+          if (Array.isArray(keys)) return Object.fromEntries(keys.map((key) => [key, storage[key]]));
+          return { ...storage };
+        },
+        set: async (updates) => Object.assign(storage, updates),
+        remove: async (key) => { delete storage[key]; },
+      },
+      session: { get: async () => ({}), set: async () => {} },
+    },
+    declarativeNetRequest: { updateEnabledRulesets: async () => {} },
+  };
+  const sandbox = { browser, console, Date, Math, Number, Object, Array, Set, Promise };
+  vm.createContext(sandbox);
+  vm.runInContext(
+    readFileSync(new URL("../background/service-worker.js", import.meta.url), "utf8"),
+    sandbox,
+    { filename: "background/service-worker.js" }
+  );
+  return { send: (message) => messageListener(message, {}), storage };
+}
 
 test("cleanUrl strips tracking params and keeps functional ones", () => {
   const { YTWash } = loadFeedEnvironment();
@@ -83,4 +117,23 @@ test("REGRESSION (Bug #1): store.ready() still resolves even if both storage and
 
   await store.ready();
   assert.ok(store.settings.masterEnabled);
+});
+
+test("SET_SETTINGS preserves manual slider overrides while capping repeat counts", async () => {
+  const { send, storage } = loadBackgroundEnvironment();
+
+  const override = await send({
+    type: "SET_SETTINGS",
+    settings: { threshold: 1.5, repeatThreshold: 25 },
+  });
+  assert.equal(override.settings.threshold, 1.5);
+  assert.equal(override.settings.repeatThreshold, 25);
+
+  const capped = await send({ type: "SET_SETTINGS", settings: { repeatThreshold: 100001 } });
+  assert.equal(capped.settings.repeatThreshold, 100000);
+
+  const persisted = await send({ type: "GET_STATE" });
+  assert.equal(persisted.settings.threshold, 1.5);
+  assert.equal(persisted.settings.repeatThreshold, 100000);
+  assert.equal(storage.settings.threshold, 1.5);
 });

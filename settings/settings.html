@@ -14,7 +14,11 @@
 
       <div class="field">
         <label for="threshold">
-          Watched threshold: <output id="thresholdValue">80%</output>
+          Watched threshold:
+          <span class="slider-value">
+            <output id="thresholdValue">80%</output>
+            <input type="number" id="thresholdValueInput" step="1" class="slider-value-input" />
+          </span>
         </label>
         <input type="range" id="threshold" min="50" max="100" step="1" />
         <p class="hint">A video counts as watched once you've seen this much of it.</p>
@@ -41,7 +45,11 @@
 
       <div class="field">
         <label for="repeatThreshold">
-          Hide after it has appeared <output id="repeatThresholdValue">1 time</output>
+          Hide after it has appeared
+          <span class="slider-value">
+            <output id="repeatThresholdValue">1 time</output>
+            <input type="number" id="repeatThresholdValueInput" step="1" class="slider-value-input" />
+          </span>
         </label>
         <input type="range" id="repeatThreshold" min="1" max="10" step="1" />
         <p class="hint">

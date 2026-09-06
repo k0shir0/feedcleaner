@@ -15,7 +15,9 @@ https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
 - **Repeat Video Fixer**: counts how often a card has been
   in your viewport (≥50% visible, once per page visit) and hides videos that
   keep reappearing unwatched — after 1 prior sighting by default,
-  configurable 1–10 in settings. Hide decisions use sighting counts
+  configurable in settings. Click either threshold value to type an exact
+  number, including one above the slider's default range. Hide decisions
+  use sighting counts
   snapshotted at navigation time, so a card never vanishes while you're
   looking at it.
 - **Link cleaner**: strips
