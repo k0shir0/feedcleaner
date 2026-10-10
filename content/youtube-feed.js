@@ -46,6 +46,11 @@
     return location.pathname === "/feed/history";
   }
 
+  function isChannelPageExempt(s) {
+    // Include handles, channel IDs, legacy URLs, and all channel tabs.
+    return s.exemptChannelPages && /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)(?:\/|$)/.test(location.pathname);
+  }
+
   /* --------------------------- card show/hide --------------------------- */
 
   function buildPlaceholder(videoId, reason, label) {
@@ -186,10 +191,11 @@
     const id = info.videoId;
     if (id && sessionReveals.has(id)) return null;
 
-    if (id && s.watchFilterEnabled && store.watched.has(id)) {
+    const channelExempt = isChannelPageExempt(s);
+    if (!channelExempt && id && s.watchFilterEnabled && store.watched.has(id)) {
       return { reason: "watched", label: "Already watched" };
     }
-    if (id && s.repeatEnabled) {
+    if (!channelExempt && id && s.repeatEnabled) {
       const seenCount = seenSnapshot.get(id) ?? 0;
       if (seenCount >= s.repeatThreshold) {
         return {
@@ -254,7 +260,7 @@
     (entries) => {
       if (isHistoryPage()) return;
       const s = store.settings;
-      if (!s.masterEnabled || !s.repeatEnabled) return;
+      if (!s.masterEnabled || !s.repeatEnabled || isChannelPageExempt(s)) return;
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         // "Seen" = half the card is on screen — OR the card covers half

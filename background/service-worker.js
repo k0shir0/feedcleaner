@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   showLabel: true, // "Already watched" label on placeholder cards
   repeatEnabled: true, // Repeat Video Fixer: hide cards seen too often
   repeatThreshold: 1, // hide after this many prior feed sightings
+  exemptChannelPages: false, // show watched/seen cards on channel pages
   stripLinks: true, // strip tracking params from copied/shared YT links
   purgeDays: 0, // auto-forget watched/seen entries older than N days; 0 = never
   beaconBlockEnabled: false, // opt-in: enable the yt-beacons DNR ruleset
@@ -104,6 +105,7 @@ function sanitizeSettings(patch) {
     "placeholderMode",
     "showLabel",
     "repeatEnabled",
+    "exemptChannelPages",
     "stripLinks",
     "beaconBlockEnabled",
     "stillWatchingEnabled",

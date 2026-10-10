@@ -5,6 +5,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
 import { loadFeedEnvironment, makeCard, FakeElement } from "./helpers.mjs";
 
 function env(opts) {
@@ -66,6 +68,143 @@ test("repeat rule uses the navigation snapshot, not live counts", () => {
   api.setSeenSnapshot(new Map([["abcdefghijk", 1]])); // below threshold at nav time
   const decision = api.decideCard({ videoId: "abcdefghijk", title: "t" }, api.getSettings());
   assert.equal(decision, null);
+});
+
+test("channel exemption is opt-in and covers every channel URL and tab", () => {
+  for (const pathname of [
+    "/@example", "/@example/", "/@example/videos", "/@example/shorts",
+    "/@example/streams", "/@example/search", "/channel/UCexample",
+    "/channel/UCexample/videos", "/c/example", "/c/example/playlists",
+    "/user/example", "/user/example/videos",
+  ]) {
+    const { api, store } = env({ pathname, watched: ["watched1234"] });
+    api.setSeenSnapshot(new Map([["repeated123", 2]]));
+    const watched = { videoId: "watched1234" };
+    const repeated = { videoId: "repeated123" };
+    assert.equal(store.settings.exemptChannelPages, false);
+    assert.equal(api.decideCard(watched, store.settings).reason, "watched", pathname);
+    assert.equal(api.decideCard(repeated, store.settings).reason, "repeat", pathname);
+    store.settings.exemptChannelPages = true;
+    assert.equal(api.decideCard(watched, store.settings), null, pathname);
+    assert.equal(api.decideCard(repeated, store.settings), null, pathname);
+  }
+});
+
+test("channel exemption keeps watched and repeat filtering on other surfaces", () => {
+  for (const pathname of [
+    "/", "/feed/subscriptions", "/results", "/watch", "/shorts/video12345",
+    "/playlist", "/channels", "/channel/", "/c/", "/user/",
+  ]) {
+    const { api, store } = env({
+      pathname, watched: ["watched1234"], settings: { exemptChannelPages: true },
+    });
+    api.setSeenSnapshot(new Map([["repeated123", 2]]));
+    assert.equal(api.decideCard({ videoId: "watched1234" }, store.settings).reason, "watched", pathname);
+    assert.equal(api.decideCard({ videoId: "repeated123" }, store.settings).reason, "repeat", pathname);
+  }
+});
+
+test("exempt channel pages still apply each feed cleanup rule", () => {
+  for (const [settings, info, reason] of [
+    [{ blockedChannels: ["example"] }, { channelName: "Example" }, "channel"],
+    [{ keywordFilters: ["hidden"] }, { title: "Hidden video" }, "keyword"],
+    [{ minDurationSec: 60 }, { durationSec: 30 }, "duration"],
+    [{ hideMixes: true }, { isMix: true }, "mix"],
+    [{ hideLive: true }, { isLive: true }, "live"],
+    [{ hidePremieres: true }, { isUpcoming: true }, "premiere"],
+    [{ hideShorts: true }, { isShort: true }, "shorts"],
+  ]) {
+    const { api, store } = env({
+      pathname: "/@example/videos", watched: ["watched1234"],
+      settings: { exemptChannelPages: true, ...settings },
+    });
+    api.compileMatchers();
+    api.setSeenSnapshot(new Map([["watched1234", 2]]));
+    assert.equal(api.decideCard({ videoId: "watched1234", ...info }, store.settings).reason, reason);
+  }
+});
+
+test("channel exemption restores cards on settings changes and SPA navigation in both hide modes", async () => {
+  for (const placeholderMode of [true, false]) {
+    const { api, store, document, window, sandbox } = env({
+      pathname: "/@example/videos", watched: ["watched1234"],
+      seen: { repeated123: 2 }, settings: { placeholderMode },
+    });
+    const cards = [makeCard({ id: "watched1234" }), makeCard({ id: "repeated123" })];
+    for (const card of cards) document.body.appendChild(card);
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 80));
+    const assertFiltered = () => {
+      assert.equal(cards[0].dataset.ytwashReason, "watched");
+      assert.equal(cards[1].dataset.ytwashReason, "repeat");
+    };
+    const assertVisible = () => {
+      for (const card of cards) {
+        assert.equal(card.dataset.ytwashState, undefined);
+        assert.notEqual(card.style.display, "none");
+        assert.equal(card.querySelector(":scope > .ytwash-placeholder"), null);
+        assert.equal(card.classList.contains("ytwash-placeholder-host"), false);
+      }
+    };
+    await settle();
+    assertFiltered();
+    store.settings.exemptChannelPages = true;
+    store._notify({ settingsChanged: true });
+    await settle();
+    assertVisible();
+    sandbox.location.pathname = "/";
+    for (const fn of window._listeners["yt-navigate-finish"]) fn();
+    await settle();
+    assertFiltered();
+    sandbox.location.pathname = "/channel/UCexample/videos";
+    for (const fn of window._listeners["yt-navigate-finish"]) fn();
+    await settle();
+    assertVisible();
+    store.settings.exemptChannelPages = false;
+    store._notify({ settingsChanged: true });
+    await settle();
+    assertFiltered();
+  }
+});
+
+test("exempt channel visits do not add repeat sightings, including after SPA navigation", async () => {
+  const { store, document, sandbox, window, browser } = env({
+    loadFeedModule: false, pathname: "/@example/videos",
+    settings: { exemptChannelPages: true },
+  });
+  let onSightings;
+  sandbox.IntersectionObserver = class {
+    constructor(callback) { onSightings = callback; }
+    observe() {}
+    disconnect() {}
+  };
+  store._ready = Promise.resolve();
+  // Capture the real observer callback without adding a production test hook.
+  vm.runInContext(readFileSync(new URL("../content/youtube-feed.js", import.meta.url), "utf8"), sandbox);
+  await Promise.resolve();
+  const card = makeCard({ id: "channel1234" });
+  document.body.appendChild(card);
+  const entries = [{ target: card, isIntersecting: true, intersectionRatio: 1 }];
+  const navigate = (pathname) => {
+    sandbox.location.pathname = pathname;
+    for (const fn of window._listeners["yt-navigate-finish"]) fn();
+  };
+  const flush = () => { for (const fn of window._listeners.pagehide) fn(); };
+  const batches = () => browser.runtime.sendMessage._sent.filter((message) => message.type === "SEEN_BATCH");
+  onSightings(entries);
+  flush();
+  assert.equal(batches().length, 0);
+  navigate("/");
+  onSightings(entries);
+  navigate("/@example/videos"); // Flush the legitimate sighting from Home.
+  assert.equal(batches().length, 1);
+  assert.deepEqual(Array.from(batches()[0].ids), ["channel1234"]);
+  onSightings(entries);
+  flush();
+  assert.equal(batches().length, 1);
+  store.settings.exemptChannelPages = false;
+  onSightings(entries);
+  flush();
+  assert.equal(batches().length, 2);
 });
 
 test("sessionReveals override every other reason for that ID", () => {

@@ -238,6 +238,7 @@ const YTWash = (() => {
       showLabel: true,
       repeatEnabled: true,
       repeatThreshold: 1,
+      exemptChannelPages: false,
       stripLinks: true,
       purgeDays: 0,
       beaconBlockEnabled: false,
