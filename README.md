@@ -2,6 +2,8 @@
 Feed Cleaner is now PUBLIC on Firefox!!! You can download directly from Firefox here:
 https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
 
+ZIP builds and older versions are available on [GitHub Releases](https://github.com/k0shir0/feedcleaner/releases).
+
 
 
 
