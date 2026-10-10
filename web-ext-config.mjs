@@ -11,7 +11,7 @@ export default {
     "docs",
     "e2e",
     "filter-lists",
-    "graphify-out/**",
+    "graphify-out",
     "tests",
     "README.md",
     "LICENSE",

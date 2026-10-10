@@ -2,6 +2,8 @@
 Feed Cleaner is now PUBLIC on Firefox!!! You can download directly from Firefox here:
 https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
 
+ZIP builds and older versions are available on [GitHub Releases](https://github.com/k0shir0/feedcleaner/releases).
+
 
 
 
@@ -10,8 +12,12 @@ https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
   videos you have repeatedly seen in the YouTube home feed, then hides their
   cards after a configurable threshold (default 80%). It filters the home
   feed, search results, watch-page sidebar, and channel pages, but always
-  leaves the YouTube History page untouched. You can configure a placeholder
-  instead of hiding repeat videos outright.
+  leaves the YouTube History page untouched. In Settings > Watch Filter,
+  check **Show watched and seen videos on channel pages** to exempt channel
+  pages from both watched and repeat filtering (off by default). Exempt
+  channel visits do not add repeat sightings; other feed cleanup filters
+  still apply. You can configure a placeholder instead of hiding repeat
+  videos outright.
 - **Repeat Video Fixer**: counts how often a card has been
   in your viewport (≥50% visible, once per page visit) and hides videos that
   keep reappearing unwatched — after 1 prior sighting by default,

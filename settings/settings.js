@@ -7,6 +7,7 @@ const BOOL_SETTINGS = [
   "placeholderMode",
   "showLabel",
   "repeatEnabled",
+  "exemptChannelPages",
   "stripLinks",
   "beaconBlockEnabled",
   "stillWatchingEnabled",

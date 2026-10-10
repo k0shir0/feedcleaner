@@ -119,6 +119,21 @@ test("REGRESSION (Bug #1): store.ready() still resolves even if both storage and
   assert.ok(store.settings.masterEnabled);
 });
 
+test("channel exemption defaults off, persists, validates, and survives backup import", async () => {
+  const { send, storage } = loadBackgroundEnvironment({ settings: { threshold: 0.9 } });
+  assert.equal((await send({ type: "GET_STATE" })).settings.exemptChannelPages, false);
+  await send({ type: "SET_SETTINGS", settings: { exemptChannelPages: true } });
+  assert.equal(storage.settings.exemptChannelPages, true);
+  assert.equal(storage.settings.threshold, 0.9);
+  await send({ type: "SET_SETTINGS", settings: { exemptChannelPages: "false" } });
+  assert.equal(storage.settings.exemptChannelPages, true);
+  const backup = await send({ type: "GET_BACKUP" });
+  await send({ type: "SET_SETTINGS", settings: { exemptChannelPages: false } });
+  assert.equal(storage.settings.exemptChannelPages, false);
+  await send({ type: "IMPORT_BACKUP", data: backup, mode: "replace" });
+  assert.equal((await send({ type: "GET_STATE" })).settings.exemptChannelPages, true);
+});
+
 test("SET_SETTINGS preserves manual slider overrides while capping repeat counts", async () => {
   const { send, storage } = loadBackgroundEnvironment();
 
