@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/feedcleaner-banner.png" alt="FeedCleaner" width="900">
+</p>
+
 # FeedCleaner is now PUBLISHED! 
 Feed Cleaner is now PUBLIC on Firefox!!! You can download directly from Firefox here:
 https://addons.mozilla.org/en-US/firefox/addon/feedcleaner/
